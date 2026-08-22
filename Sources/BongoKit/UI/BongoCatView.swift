@@ -58,7 +58,10 @@ struct BongoCatView: View {
         // under any multiplier.
         .colorMultiply(skin.bodyColor)
         .saturation(state == .failed ? 0 : 1)
-        .opacity(state == .sleeping ? 0.55 : 1)
+        // Dimmed, not ghosted. At 0.55 a white cat all but vanished into a light
+        // wallpaper; the `zzz` badge now carries the meaning, so the fade only has
+        // to hint at it.
+        .opacity(state == .sleeping ? 0.8 : 1)
         // Lifts a white cat off a light wallpaper without putting a panel behind it.
         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
     }
@@ -82,14 +85,26 @@ struct BongoCatView: View {
 
     // MARK: - Badge
 
+    /// Symbol, colour, and how far to shrink the glyph so it fits the circle.
+    /// `ellipsis` and `zzz` are much wider than they are tall, which is what
+    /// `glyphScale` is for.
+    private struct BadgeStyle {
+        let symbol: String
+        let color: Color
+        var glyphScale: Double = 1
+    }
+
     @ViewBuilder
     private var badge: some View {
-        if let symbol = badgeSymbol {
-            Image(systemName: symbol)
-                .font(.system(size: max(10, width * 0.075), weight: .bold))
+        if let style = badgeStyle {
+            Image(systemName: style.symbol)
+                .font(.system(size: badgeDiameter * 0.66 * style.glyphScale, weight: .bold))
                 .foregroundStyle(.white)
-                .padding(max(3, width * 0.018))
-                .background(Circle().fill(badgeColor))
+                // A square frame keeps the background a circle whatever the glyph's
+                // aspect ratio; padding alone let a wide symbol squash it into a
+                // sliver with the dots hanging outside.
+                .frame(width: badgeDiameter, height: badgeDiameter)
+                .background(Circle().fill(style.color))
                 .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: max(1, width * 0.006)))
                 .shadow(color: .black.opacity(0.4), radius: 2)
                 .offset(x: width * 0.30, y: -width * 0.02)
@@ -97,24 +112,24 @@ struct BongoCatView: View {
         }
     }
 
-    /// Only states that need something from you get a badge. Working and thinking
-    /// are already legible from the paws, and a badge on every cat would turn the
-    /// row back into the wall of noise the rhythm is meant to replace.
-    private var badgeSymbol: String? {
-        switch state {
-        case .needsInput: return "questionmark"
-        case .failed:     return "exclamationmark"
-        case .done:       return "checkmark"
-        default:          return nil
-        }
-    }
+    private var badgeDiameter: Double { max(16, width * 0.111) }
 
-    private var badgeColor: Color {
+    /// A badge only for what the paws cannot say. Working and delegating are the
+    /// exception — their rhythm already carries it, and a badge on every cat would
+    /// turn the row back into the wall of noise the rhythm is meant to replace.
+    ///
+    /// The three alert colours stay reserved for states that owe you something.
+    /// Thinking and sleeping report rather than ask, so they take cool, quiet
+    /// colours: they earn a badge only because the paws alone leave them ambiguous
+    /// — thinking against idle, sleeping against failed.
+    private var badgeStyle: BadgeStyle? {
         switch state {
-        case .needsInput: return .orange
-        case .failed:     return .red
-        case .done:       return .green
-        default:          return .clear
+        case .needsInput: return BadgeStyle(symbol: "questionmark", color: .orange)
+        case .failed:     return BadgeStyle(symbol: "exclamationmark", color: .red)
+        case .done:       return BadgeStyle(symbol: "checkmark", color: .green)
+        case .thinking:   return BadgeStyle(symbol: "ellipsis", color: .blue, glyphScale: 0.8)
+        case .sleeping:   return BadgeStyle(symbol: "zzz", color: .gray, glyphScale: 0.75)
+        default:          return nil
         }
     }
 
