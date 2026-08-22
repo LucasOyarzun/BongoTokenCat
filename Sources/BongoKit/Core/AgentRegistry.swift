@@ -1,0 +1,76 @@
+import Foundation
+import Observation
+
+/// Live roster of agent sessions, keyed by Claude Code `session_id`.
+///
+/// Single source of truth for the overlay: hook events flow in, decayed states and
+/// drum bursts flow out. Nothing here touches the network or the filesystem, which
+/// is what makes the state machine testable on its own.
+@MainActor
+@Observable
+final class AgentRegistry {
+    private(set) var agents: [String: Agent] = [:]
+
+    /// Sessions that ended and have been quiet long enough to stop showing.
+    private static let removeAfter: TimeInterval = 30 * 60
+
+    /// Agents worth drawing, in a stable order so cats do not swap places on screen.
+    var visibleAgents: [Agent] {
+        agents.values
+            .sorted { ($0.label, $0.id) < ($1.label, $1.id) }
+    }
+
+    /// The single state standing for the whole fleet, for single-cat mode.
+    var aggregateState: AgentState {
+        visibleAgents.map(\.state).max { $0.priority < $1.priority } ?? .sleeping
+    }
+
+    /// In single-cat mode the cat drums if anything at all is working.
+    var aggregateIsDrumming: Bool { visibleAgents.contains { $0.isDrumming } }
+
+    func apply(_ event: HookEvent, now: Date = Date()) {
+        guard let state = EventMapping.state(for: event) else { return }
+        let burst = DrumEngine.burstDuration(for: event)
+        let existing = agents[event.sessionId]
+
+        let path = event.cwd ?? existing?.projectPath ?? ""
+        agents[event.sessionId] = Agent(
+            id: event.sessionId,
+            state: state,
+            workspaceInfo: path.isEmpty
+                ? (existing?.workspaceInfo ?? WorkspaceInfo(directory: "unknown", project: nil, branch: nil))
+                : GitContext.info(for: path, now: now),
+            projectPath: path,
+            toolName: event.toolName ?? existing?.toolName,
+            lastEventAt: now,
+            lastMessage: event.producedText ?? existing?.lastMessage,
+            // Never cut a burst short: a fresh event extends the drumming, it does
+            // not restart it, so back-to-back turns read as one continuous roll.
+            drumsUntil: max(existing?.drumsUntil ?? .distantPast, now.addingTimeInterval(burst))
+        )
+    }
+
+    /// Ages states that have gone quiet and drops sessions long dead.
+    /// Called on a timer — decay is elapsed-time driven, not event driven, so
+    /// nothing else would ever move an abandoned session off `working`.
+    func decay(now: Date = Date()) {
+        for (id, agent) in agents {
+            let elapsed = now.timeIntervalSince(agent.lastEventAt)
+            if elapsed >= Self.removeAfter, agent.state == .sleeping {
+                agents[id] = nil
+                continue
+            }
+            let aged = StateDecay.decayed(agent.state, silentFor: elapsed)
+            guard aged != agent.state else { continue }
+            agents[id]?.state = aged
+        }
+    }
+
+    /// Clears a "waiting for you" flag once the user has clearly moved on.
+    func acknowledge(_ sessionID: String) {
+        guard agents[sessionID]?.state.awaitsUser == true else { return }
+        agents[sessionID]?.state = .idle
+    }
+
+    func removeAll() { agents.removeAll() }
+}
