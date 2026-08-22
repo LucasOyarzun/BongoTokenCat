@@ -11,6 +11,11 @@ private func registryEvent(_ name: String,
               messageText: text, lastAssistantMessage: nil)
 }
 
+/// Test workspaces are fictional paths, so whether they exist has to be stated
+/// rather than looked up on the real filesystem.
+private let workspaceIsAlive: @Sendable (String) -> Bool = { _ in true }
+private let workspaceWasArchived: @Sendable (String) -> Bool = { _ in false }
+
 @MainActor
 func runAgentRegistryTests() {
     suite("Agent registry") {
@@ -79,7 +84,8 @@ func runAgentRegistryTests() {
             let start = Date()
             registry.apply(registryEvent("PreToolUse", session: "a", tool: "Edit"), now: start)
 
-            registry.decay(now: start.addingTimeInterval(StateDecay.toIdle + 1))
+            registry.decay(now: start.addingTimeInterval(StateDecay.toIdle + 1),
+                           workspaceExists: workspaceIsAlive)
 
             expectEqual(registry.agents["a"]?.state, .idle)
         }
@@ -89,7 +95,8 @@ func runAgentRegistryTests() {
             let start = Date()
             registry.apply(registryEvent("SessionEnd", session: "a"), now: start)
 
-            registry.decay(now: start.addingTimeInterval(31 * 60))
+            registry.decay(now: start.addingTimeInterval(31 * 60),
+                           workspaceExists: workspaceIsAlive)
 
             expect(registry.agents.isEmpty, "a dead session should stop taking up screen space")
         }
@@ -99,10 +106,42 @@ func runAgentRegistryTests() {
             let start = Date()
             registry.apply(registryEvent("PreToolUse", session: "a", tool: "Edit"), now: start)
 
-            registry.decay(now: start.addingTimeInterval(31 * 60))
+            registry.decay(now: start.addingTimeInterval(31 * 60),
+                           workspaceExists: workspaceIsAlive)
 
             expectEqual(registry.agents["a"]?.state, .sleeping,
                         "a quiet but never-ended session sleeps rather than vanishing")
+        }
+
+        // Conductor deletes a workspace's worktree when you archive it.
+        test("drops a cat as soon as its workspace is archived") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("StopFailure", session: "a"))
+
+            registry.decay(workspaceExists: workspaceWasArchived)
+
+            expect(registry.agents.isEmpty, "an archived workspace takes its cat with it")
+        }
+
+        test("keeps a cat whose workspace is still on disk") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("StopFailure", session: "a"))
+
+            registry.decay(workspaceExists: workspaceIsAlive)
+
+            expectEqual(registry.agents["a"]?.state, .failed)
+        }
+
+        // Without a cwd there is no path to judge, and a missing one must not read
+        // as "archived" — that would silently drop every session on an older hook
+        // payload.
+        test("keeps a cat whose path was never known") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("Stop", session: "a", cwd: nil))
+
+            registry.decay(workspaceExists: workspaceWasArchived)
+
+            expectEqual(registry.agents["a"]?.state, .done)
         }
 
         test("clears a question once acknowledged") {

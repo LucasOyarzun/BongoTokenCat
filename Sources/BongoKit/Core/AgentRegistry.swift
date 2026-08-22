@@ -4,8 +4,9 @@ import Observation
 /// Live roster of agent sessions, keyed by Claude Code `session_id`.
 ///
 /// Single source of truth for the overlay: hook events flow in, decayed states and
-/// drum bursts flow out. Nothing here touches the network or the filesystem, which
-/// is what makes the state machine testable on its own.
+/// drum bursts flow out. Nothing here reaches for the network or the filesystem on
+/// its own — `decay` takes the one existence check it needs as a parameter — which
+/// is what keeps the state machine testable in isolation.
 @MainActor
 @Observable
 final class AgentRegistry {
@@ -55,10 +56,23 @@ final class AgentRegistry {
     }
 
     /// Ages states that have gone quiet and drops sessions long dead.
+    ///
     /// Called on a timer — decay is elapsed-time driven, not event driven, so
     /// nothing else would ever move an abandoned session off `working`.
-    func decay(now: Date = Date()) {
+    ///
+    /// `workspaceExists` is injected rather than called directly so the state
+    /// machine stays a pure function of its inputs under test. One `stat` per agent
+    /// per tick is far cheaper than the git calls `apply` already makes.
+    func decay(now: Date = Date(),
+               workspaceExists: (String) -> Bool = FileManager.default.fileExists(atPath:)) {
         for (id, agent) in agents {
+            // Archiving a Conductor workspace deletes its worktree directory, so a
+            // vanished path means the session cannot still be alive. It goes now
+            // rather than waiting out a decay it would never finish.
+            if !agent.projectPath.isEmpty, !workspaceExists(agent.projectPath) {
+                agents[id] = nil
+                continue
+            }
             let elapsed = now.timeIntervalSince(agent.lastEventAt)
             if elapsed >= Self.removeAfter, agent.state == .sleeping {
                 agents[id] = nil
