@@ -37,6 +37,32 @@ func test(_ name: String, _ body: () -> Void) {
     }
 }
 
+/// Async twins of `suite` and `test`, for the handful of cases that have to await
+/// something real — binding a socket, mostly.
+///
+/// Separate names rather than overloads on the closure's effects: the compiler
+/// would happily pick the synchronous one for a body that forgot its `await`, and
+/// the test would pass without ever running what it claims to.
+@MainActor
+func asyncSuite(_ name: String, _ body: () async -> Void) async {
+    TestReport.currentSuite = name
+    print("\n\(name)")
+    await body()
+}
+
+@MainActor
+func asyncTest(_ name: String, _ body: () async -> Void) async {
+    TestReport.currentTest = name
+    TestReport.failedInCurrentTest = false
+    await body()
+    if TestReport.failedInCurrentTest {
+        print("  ✘ \(name)")
+    } else {
+        TestReport.passed += 1
+        print("  ✔ \(name)")
+    }
+}
+
 @MainActor
 func expect(_ condition: Bool, _ description: @autoclosure () -> String,
             file: StaticString = #fileID, line: UInt = #line) {
