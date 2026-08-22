@@ -10,10 +10,14 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies, personal use.
 
 - **One cat per agent**, labelled with its git branch — or a single cat standing for
   the whole fleet. Toggle in the menu.
-- **The rhythm is the signal.** Cats drum while their agent streams output and hold
-  their paws up while it waits on the model. A busy row looks busy.
-- **Badges only when you are needed**: `?` waiting for you, `!` error, `✓` done.
-  Working and thinking need no badge — the paws already say it.
+- **The rhythm is the signal.** Cats drum while their agent streams output, and tap
+  slowly between bursts so a working agent never looks like a stopped one. A busy
+  row looks busy.
+- **Badges for what the paws cannot say**: `…` thinking, `zzz` asleep, `?` waiting
+  for you, `!` error, `✓` done. Working and delegating need none — the rhythm
+  carries it.
+- **Click a cat to dismiss its badge.** `…` fades on its own, but `?`, `!` and `✓`
+  hold until you have actually looked at them.
 - **Skins unlock with tokens spent.** Six coat colours, from plain white at zero to
   gold at 100B.
 - **Drag a cat anywhere.** Size runs from 44pt to 320pt; the gaps between cats stay
@@ -23,16 +27,23 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies, personal use.
 
 | Hook event | State | Cat |
 |---|---|---|
-| `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming |
-| `PreToolUse(Task)` / `SubagentStart` | delegating | drumming |
-| `UserPromptSubmit` | thinking | paws up |
+| `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming, slow tap between bursts |
+| `PreToolUse(Task)` / `SubagentStart` | delegating | same as working |
+| `UserPromptSubmit` | thinking | paws up, `…` |
 | `Notification` / `Elicitation` | waiting for you | one paw raised, `?` |
 | `Stop` | done | paws up, `✓` |
 | `StopFailure` / `PostToolUseFailure` | error | slumped, `!` |
-| `SessionEnd`, or 15 min silent | asleep | faded, paws down |
+| `SessionStart`, or 45s silent | idle | paws up, no badge |
+| `SessionEnd`, or 15 min silent | asleep | dimmed, paws down, `zzz` |
 
 States age on their own: 45s silent drops to idle, 15 min to asleep, 30 min after
-a session ends the cat disappears. Anything waiting on *you* never ages out.
+a session ends the cat disappears. The three states that carry something for *you*
+— a question, a finish, an error — never age out; click the cat to clear them.
+
+Archiving a Conductor workspace deletes its worktree, and a cat whose directory is
+gone is dropped on the next tick whatever state it was in. Without that the three
+states above would never age their way to removal, and an archived workspace would
+leave a cat behind for good.
 
 ## Install
 
