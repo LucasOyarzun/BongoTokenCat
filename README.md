@@ -18,8 +18,8 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
 - **The rhythm is the signal.** Cats drum while their agent streams output, and tap
   slowly between bursts so a working agent never looks like a stopped one. A busy
   row looks busy.
-- **Badges for what the paws cannot say**: `…` thinking, `zzz` asleep, `?` waiting
-  for you, `!` error, `✓` done. Working and delegating need none — the rhythm
+- **Badges for what the paws cannot say**: `…` thinking, `zzz` sleeping, `?` needs
+  input, `!` failed, `✓` done. Working and delegating need none — the rhythm
   carries it.
 - **Click a cat to dismiss its badge.** `…` fades on its own, but `?`, `!` and `✓`
   hold until you have actually looked at them.
@@ -30,20 +30,22 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
 
 ### States
 
-| Hook event | State | Cat |
-|---|---|---|
-| `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming, slow tap between bursts |
-| `PreToolUse(Task)` / `SubagentStart` | delegating | same as working |
-| `UserPromptSubmit` | thinking | paws up, `…` |
-| `Notification` / `Elicitation` | waiting for you | one paw raised, `?` |
-| `Stop` | done | paws up, `✓` |
-| `StopFailure` / `PostToolUseFailure` | error | slumped, `!` |
-| `SessionStart`, or 45s silent | idle | paws up, no badge |
-| `SessionEnd`, or 15 min silent | asleep | dimmed, paws down, `zzz` |
+![The eight cat states, left to right: sleeping, idle, thinking, working, delegating, done, needs input, failed](assets/states.png)
 
-States age on their own: 45s silent drops to idle, 15 min to asleep, 30 min after
+| | Hook event | State | Cat |
+|---|---|---|---|
+| 1 | `SessionEnd`, or 15 min silent | sleeping | dimmed, paws down, `zzz` |
+| 2 | `SessionStart`, or 45s silent | idle | paws up, no badge |
+| 3 | `UserPromptSubmit` | thinking | paws up, `…` |
+| 4 | `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming, slow tap between bursts |
+| 5 | `PreToolUse(Task)` / `SubagentStart` | delegating | same as working |
+| 6 | `Stop` | done | paws up, `✓` |
+| 7 | `Notification` / `Elicitation` | needs input | one paw raised, `?` |
+| 8 | `StopFailure` / `PostToolUseFailure` | failed | slumped, `!` |
+
+States age on their own: 45s silent drops to idle, 15 min to sleeping, 30 min after
 a session ends the cat disappears. The three states that carry something for *you*
-— a question, a finish, an error — never age out; click the cat to clear them.
+— a question, a finish, a failure — never age out; click the cat to clear them.
 
 Archiving a Conductor workspace deletes its worktree, and a cat whose directory is
 gone is dropped on the next tick whatever state it was in. Without that the three
