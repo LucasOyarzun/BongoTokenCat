@@ -4,6 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="BongoTokenCat"
+# Kept separate from APP_NAME even though they match today: one names the product,
+# the other has to track Package.swift's `name:` for the resource bundle lookup.
+PACKAGE_NAME="BongoTokenCat"
 VERSION="0.1.0"
 # Conductor workspaces live on a filesystem where SwiftPM's SQLite build database
 # fails with a disk I/O error, so the scratch directory is kept outside the repo.
@@ -20,11 +23,14 @@ echo "==> assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SCRATCH/release/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
-# SwiftPM emits resources as a sibling bundle next to the binary. Without it the
-# app launches and draws nothing, so a missing bundle is a hard failure.
-# -L because SwiftPM's "release" is a symlink to the arch-specific directory.
-BUNDLE=$(find -L "$SCRATCH/release" -maxdepth 1 -name '*BongoKit.bundle' -print -quit)
-[ -n "$BUNDLE" ] || { echo "no resource bundle found in $SCRATCH/release" >&2; exit 1; }
+# SwiftPM emits resources as a sibling bundle next to the binary, named
+# "<package>_<target>.bundle" — the exact name `Bundle.module` looks for at
+# runtime. Match it exactly rather than globbing: a scratch directory that has
+# survived a package rename holds bundles under both names, and copying the wrong
+# one produces an app that builds cleanly and then traps on launch.
+RESOURCE_BUNDLE="${PACKAGE_NAME}_BongoKit.bundle"
+BUNDLE="$SCRATCH/release/$RESOURCE_BUNDLE"
+[ -d "$BUNDLE" ] || { echo "no $RESOURCE_BUNDLE in $SCRATCH/release" >&2; exit 1; }
 cp -R "$BUNDLE" "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
