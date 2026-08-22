@@ -1,0 +1,105 @@
+import Foundation
+import Observation
+
+/// How many cats to show.
+enum CatMode: String, Codable, Sendable, CaseIterable {
+    /// One cat standing for everything you have running.
+    case single
+    /// One cat per agent session, labelled by workspace.
+    case perAgent
+
+    var label: String {
+        switch self {
+        case .single:   return "One cat"
+        case .perAgent: return "One cat per agent"
+        }
+    }
+}
+
+/// Where the row of cats sits on screen.
+enum OverlayAnchor: String, Codable, Sendable, CaseIterable {
+    case bottomLeading, bottomTrailing, topLeading, topTrailing
+
+    var label: String {
+        switch self {
+        case .bottomLeading:  return "Bottom left"
+        case .bottomTrailing: return "Bottom right"
+        case .topLeading:     return "Top left"
+        case .topTrailing:    return "Top right"
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class Settings {
+    private let defaults = UserDefaults.standard
+
+    var catMode: CatMode {
+        didSet { defaults.set(catMode.rawValue, forKey: Keys.catMode) }
+    }
+    var skinID: String {
+        didSet { defaults.set(skinID, forKey: Keys.skinID) }
+    }
+    var catWidth: Double {
+        didSet { defaults.set(catWidth, forKey: Keys.catWidth) }
+    }
+    var anchor: OverlayAnchor {
+        didSet { defaults.set(anchor.rawValue, forKey: Keys.anchor) }
+    }
+    var showsOverlay: Bool {
+        didSet { defaults.set(showsOverlay, forKey: Keys.showsOverlay) }
+    }
+    var showsWorkspaceLabels: Bool {
+        didSet { defaults.set(showsWorkspaceLabels, forKey: Keys.showsWorkspaceLabels) }
+    }
+
+    /// Where the user dragged the cats to. `nil` means "keep following `anchor`",
+    /// which is also what Reset position restores.
+    private(set) var overlayOrigin: CGPoint?
+
+    private enum Keys {
+        static let catMode = "catMode"
+        static let skinID = "skinID"
+        static let catWidth = "catWidth"
+        static let anchor = "anchor"
+        static let showsOverlay = "showsOverlay"
+        static let showsWorkspaceLabels = "showsWorkspaceLabels"
+        static let hasCustomPosition = "hasCustomPosition"
+        static let originX = "overlayOriginX"
+        static let originY = "overlayOriginY"
+    }
+
+    /// 44pt still reads as a cat at a glance; below that the paws stop being
+    /// legible, which is the whole point of the thing.
+    static let minimumCatWidth: Double = 44
+    static let maximumCatWidth: Double = 320
+    static let defaultCatWidth: Double = 96
+
+    init() {
+        catMode = CatMode(rawValue: defaults.string(forKey: Keys.catMode) ?? "") ?? .perAgent
+        skinID = defaults.string(forKey: Keys.skinID) ?? SkinCatalog.defaultSkin.id
+        catWidth = defaults.object(forKey: Keys.catWidth) as? Double ?? Self.defaultCatWidth
+        anchor = OverlayAnchor(rawValue: defaults.string(forKey: Keys.anchor) ?? "") ?? .bottomTrailing
+        showsOverlay = defaults.object(forKey: Keys.showsOverlay) as? Bool ?? true
+        showsWorkspaceLabels = defaults.object(forKey: Keys.showsWorkspaceLabels) as? Bool ?? true
+        if defaults.bool(forKey: Keys.hasCustomPosition) {
+            overlayOrigin = CGPoint(x: defaults.double(forKey: Keys.originX),
+                                    y: defaults.double(forKey: Keys.originY))
+        }
+    }
+
+    func moveOverlay(to origin: CGPoint) {
+        overlayOrigin = origin
+        defaults.set(true, forKey: Keys.hasCustomPosition)
+        defaults.set(origin.x, forKey: Keys.originX)
+        defaults.set(origin.y, forKey: Keys.originY)
+    }
+
+    func resetOverlayPosition() {
+        overlayOrigin = nil
+        defaults.set(false, forKey: Keys.hasCustomPosition)
+    }
+
+    var skin: Skin { SkinCatalog.skin(id: skinID) }
+}
