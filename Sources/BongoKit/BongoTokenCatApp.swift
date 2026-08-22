@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Entry point. The executable target is only a call to this, which keeps every
 /// line of logic inside a library the tests can import.
-public enum BongoTokenBar {
+public enum BongoTokenCat {
     @MainActor
     public static func run() -> Never {
         let app = NSApplication.shared
@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startTimers()
         Task { await model.refreshTotals() }
         overlay.sync()
-        AppLog.write("BongoTokenBar started")
+        AppLog.write("BongoTokenCat started")
     }
 
     func applicationWillTerminate(_ notification: Notification) {

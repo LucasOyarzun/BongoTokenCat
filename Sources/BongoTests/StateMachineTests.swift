@@ -109,11 +109,11 @@ func runGitContextTests() {
         // Conductor names a workspace folder independently of its branch, so the
         // folder name alone can be meaningless ("cebu-v2").
         test("prefers the branch over the folder name") {
-            let info = WorkspaceInfo(directory: "cebu-v2", project: "DinoTokenBar",
+            let info = WorkspaceInfo(directory: "cebu-v2", project: "BongoTokenCat",
                                      branch: "lucas/bongo-token-bar")
 
             expectEqual(info.shortLabel, "bongo-token-bar", "the prefix does not fit under a cat")
-            expectEqual(info.fullLabel, "DinoTokenBar · lucas/bongo-token-bar")
+            expectEqual(info.fullLabel, "BongoTokenCat · lucas/bongo-token-bar")
         }
 
         test("falls back to the folder when git tells us nothing") {
@@ -124,9 +124,9 @@ func runGitContextTests() {
         }
 
         test("still names the project when the branch is unknown") {
-            let info = WorkspaceInfo(directory: "cebu-v2", project: "DinoTokenBar", branch: nil)
+            let info = WorkspaceInfo(directory: "cebu-v2", project: "BongoTokenCat", branch: nil)
 
-            expectEqual(info.fullLabel, "DinoTokenBar · cebu-v2")
+            expectEqual(info.fullLabel, "BongoTokenCat · cebu-v2")
         }
 
         test("keeps an unprefixed branch whole") {

@@ -12,7 +12,7 @@ enum HookTransport {
 
     static var supportDirectory: URL {
         let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".bongotokenbar")
+            .appendingPathComponent(".bongotokencat")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

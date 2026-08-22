@@ -1,9 +1,9 @@
 #!/bin/bash
-# Assemble BongoTokenBar.app from the SwiftPM build product.
+# Assemble BongoTokenCat.app from the SwiftPM build product.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME="BongoTokenBar"
+APP_NAME="BongoTokenCat"
 VERSION="0.1.0"
 # Conductor workspaces live on a filesystem where SwiftPM's SQLite build database
 # fails with a disk I/O error, so the scratch directory is kept outside the repo.
@@ -32,7 +32,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>io.github.bongotokenbar</string>
+    <key>CFBundleIdentifier</key><string>io.github.lucasoyarzun.bongotokencat</string>
     <key>CFBundleName</key><string>$APP_NAME</string>
     <key>CFBundleExecutable</key><string>$APP_NAME</string>
     <key>CFBundlePackageType</key><string>APPL</string>

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Push a synthetic hook event into a running BongoTokenBar.
+# Push a synthetic hook event into a running BongoTokenCat.
 #
 # Lets you exercise every state without installing hooks or waiting for a real
 # agent to reach that state — which matters most for the ones you cannot summon
@@ -13,8 +13,8 @@ SESSION="${2:?missing session id}"
 CWD="${3:-/Users/$USER/workspace/demo}"
 TEXT="${4:-}"
 
-RUNTIME="$HOME/.bongotokenbar/runtime.json"
-[ -f "$RUNTIME" ] || { echo "BongoTokenBar is not running (no runtime.json)"; exit 1; }
+RUNTIME="$HOME/.bongotokencat/runtime.json"
+[ -f "$RUNTIME" ] || { echo "BongoTokenCat is not running (no runtime.json)"; exit 1; }
 PORT=$(sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' "$RUNTIME")
 TOKEN=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([a-f0-9]*\)".*/\1/p' "$RUNTIME")
 

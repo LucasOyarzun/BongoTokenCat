@@ -4,10 +4,10 @@ import Foundation
 /// fails silently by design, so without this a broken install looks identical to
 /// an idle one.
 enum AppLog {
-    private static let queue = DispatchQueue(label: "bongotokenbar.log")
+    private static let queue = DispatchQueue(label: "bongotokencat.log")
     private static let maxBytes = 512 * 1024
 
-    static var fileURL: URL { HookTransport.supportDirectory.appendingPathComponent("bongotokenbar.log") }
+    static var fileURL: URL { HookTransport.supportDirectory.appendingPathComponent("bongotokencat.log") }
 
     nonisolated(unsafe) private static let stampFormatter = ISO8601DateFormatter()
 

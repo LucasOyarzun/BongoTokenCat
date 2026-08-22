@@ -33,7 +33,7 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Hooks not installed", systemImage: "bolt.horizontal.circle")
                 .font(.headline)
-            Text("BongoTokenBar needs to register hooks in ~/.claude/settings.json to see what your agents are doing. Your existing hooks are kept — a backup is written first.")
+            Text("BongoTokenCat needs to register hooks in ~/.claude/settings.json to see what your agents are doing. Your existing hooks are kept — a backup is written first.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("Install hooks") { model.installHooks() }
