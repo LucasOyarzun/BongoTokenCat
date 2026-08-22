@@ -71,6 +71,18 @@ func runPawPositionTests() {
             expectEqual(PawPosition.drumming(at: 0.75, beatsPerSecond: 1), .bothUp)
         }
 
+        // Between bursts a working agent used to look exactly like an idle one.
+        test("taps slowly between bursts instead of holding still") {
+            expectEqual(PawPosition.idleTapping(at: 0), PawPosition(left: .down, right: .up))
+            expectEqual(PawPosition.idleTapping(at: PawPosition.idleBeat), PawPosition(left: .up, right: .down))
+        }
+
+        test("spends most of an idle beat with both paws up") {
+            expectEqual(PawPosition.idleTapping(at: PawPosition.idleStrike + 0.01), .bothUp)
+            expect(PawPosition.idleStrike < PawPosition.idleBeat / 2,
+                   "an idle tap must be a tap, not a lean")
+        }
+
         test("rests paws down when asleep or failed") {
             expectEqual(PawPosition.resting(for: .sleeping), .bothDown)
             expectEqual(PawPosition.resting(for: .failed), .bothDown)

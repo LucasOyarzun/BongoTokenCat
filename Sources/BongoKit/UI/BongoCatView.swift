@@ -66,10 +66,17 @@ struct BongoCatView: View {
         .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
     }
 
+    /// A busy agent always moves: a live burst drives the full pattern, and the gaps
+    /// between bursts fall back to a slow tap rather than to stillness, so `working`
+    /// never looks like nothing running. Everything else holds a pose — `isBusy` is
+    /// checked first so a burst that outlived its state cannot leave a failed cat
+    /// happily drumming under a red badge.
     private var currentPaws: PawPosition {
-        guard isDrumming else { return .resting(for: state) }
+        let time = now.timeIntervalSinceReferenceDate
+        guard state.isBusy else { return .resting(for: state) }
+        guard isDrumming else { return .idleTapping(at: time) }
         let beats = DrumEngine.beatsPerSecond(remaining: intensity * DrumEngine.maxBurst)
-        return .drumming(at: now.timeIntervalSinceReferenceDate, beatsPerSecond: beats)
+        return .drumming(at: time, beatsPerSecond: beats)
     }
 
     /// Layers share one canvas, so each simply fills the frame.

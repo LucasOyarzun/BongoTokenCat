@@ -113,5 +113,22 @@ func runAgentRegistryTests() {
 
             expectEqual(registry.agents["a"]?.state, .idle)
         }
+
+        // The animation timer is the app's only recurring cost, so what turns it on
+        // is worth pinning down.
+        test("animates for a busy agent even with no burst left") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("PreToolUse", session: "a", tool: "Edit"),
+                           now: Date().addingTimeInterval(-60))
+
+            expect(registry.needsAnimation, "a working agent taps between bursts")
+        }
+
+        test("stops animating once nothing is working") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("Stop", session: "a"))
+
+            expect(!registry.needsAnimation, "a finished agent holds a pose")
+        }
     }
 }

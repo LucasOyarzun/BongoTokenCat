@@ -25,8 +25,12 @@ final class AgentRegistry {
         visibleAgents.map(\.state).max { $0.priority < $1.priority } ?? .sleeping
     }
 
-    /// In single-cat mode the cat drums if anything at all is working.
-    var aggregateIsDrumming: Bool { visibleAgents.contains { $0.isDrumming } }
+    /// Anything on screen that moves: a burst in flight, or a busy agent tapping
+    /// between bursts. The overlay's animation timer runs exactly while this holds,
+    /// so an idle fleet still costs nothing.
+    var needsAnimation: Bool {
+        visibleAgents.contains { $0.isDrumming || $0.state.isBusy }
+    }
 
     func apply(_ event: HookEvent, now: Date = Date()) {
         guard let state = EventMapping.state(for: event) else { return }

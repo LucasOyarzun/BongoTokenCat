@@ -85,12 +85,12 @@ final class OverlayController {
         sync()
     }
 
-    /// Starts the animation timer when anything is drumming and stops it when
-    /// nothing is. Called from `sync()` and from the app's decay tick, so a burst
-    /// that simply runs out still shuts the timer down.
+    /// Starts the animation timer while anything on screen is moving — a burst, or
+    /// a busy agent's tap between bursts — and stops it when nothing is. Called from
+    /// `sync()` and from the app's decay tick, so a burst that simply runs out still
+    /// shuts the timer down.
     private func syncClock() {
-        let drumming = registry.visibleAgents.contains { $0.isDrumming }
-        switch (drumming, clock.isRunning) {
+        switch (registry.needsAnimation, clock.isRunning) {
         case (true, false):  clock.start()
         case (false, true):  clock.stop()
         default:             break
