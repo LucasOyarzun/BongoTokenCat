@@ -63,7 +63,28 @@ struct PawPosition: Equatable {
         )
     }
 
+    /// How long one unhurried tap-and-lift takes, and how much of that the paw
+    /// spends on the drum. A short strike inside a long beat reads as alive;
+    /// anything denser starts to compete with real drumming.
+    static let idleBeat: TimeInterval = 0.9
+    static let idleStrike: TimeInterval = 0.14
+
+    /// Holding pattern for an agent that is working but not producing right now.
+    ///
+    /// Tool calls land a median 7.7s apart, so a busy agent spends most of its life
+    /// between bursts. Resting its paws there made it indistinguishable from an idle
+    /// one — this slow tap is what keeps "busy" readable in the gaps.
+    static func idleTapping(at time: TimeInterval) -> PawPosition {
+        let cycle = time.truncatingRemainder(dividingBy: idleBeat * 2)
+        let isLeftStrike = cycle < idleStrike
+        let isRightStrike = cycle >= idleBeat && cycle < idleBeat + idleStrike
+        return PawPosition(left: isLeftStrike ? .down : .up, right: isRightStrike ? .down : .up)
+    }
+
     /// Resting pose for an agent that is not producing anything.
+    ///
+    /// `working` and `delegating` never reach this — they tap between bursts
+    /// instead — so the default covers the genuinely still states.
     static func resting(for state: AgentState) -> PawPosition {
         switch state {
         case .sleeping, .failed: return .bothDown          // slumped onto the drum

@@ -41,6 +41,7 @@ final class OverlayController {
                 rootView: OverlayView(registry: registry, settings: settings, clock: clock, columns: grid.columns)
             )
             view.onMoved = { [weak self] origin in self?.settings.moveOverlay(to: origin) }
+            view.onTapped = { [weak self] index in self?.acknowledgeCat(at: index) }
             panel.contentView = view
             hostingView = view
             mountedSignature = signature
@@ -80,17 +81,32 @@ final class OverlayController {
         if flipped.isEmpty, catCount > 0 { AppLog.write("warning: no drag targets for \(catCount) cats") }
     }
 
+    /// Clicking a cat is the "I saw it" gesture. `done`, `failed` and `needsInput`
+    /// hold their badge until it happens instead of fading on a timer, so without a
+    /// way to dismiss them they would stay on screen forever.
+    private func acknowledgeCat(at index: Int) {
+        switch settings.catMode {
+        case .single:
+            registry.acknowledgeAll()
+        case .perAgent:
+            let agents = registry.visibleAgents
+            guard agents.indices.contains(index) else { return }
+            registry.acknowledge(agents[index].id)
+        }
+        sync()
+    }
+
     func resetPosition() {
         settings.resetOverlayPosition()
         sync()
     }
 
-    /// Starts the animation timer when anything is drumming and stops it when
-    /// nothing is. Called from `sync()` and from the app's decay tick, so a burst
-    /// that simply runs out still shuts the timer down.
+    /// Starts the animation timer while anything on screen is moving — a burst, or
+    /// a busy agent's tap between bursts — and stops it when nothing is. Called from
+    /// `sync()` and from the app's decay tick, so a burst that simply runs out still
+    /// shuts the timer down.
     private func syncClock() {
-        let drumming = registry.visibleAgents.contains { $0.isDrumming }
-        switch (drumming, clock.isRunning) {
+        switch (registry.needsAnimation, clock.isRunning) {
         case (true, false):  clock.start()
         case (false, true):  clock.stop()
         default:             break

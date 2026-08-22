@@ -4,8 +4,9 @@ import Observation
 /// Live roster of agent sessions, keyed by Claude Code `session_id`.
 ///
 /// Single source of truth for the overlay: hook events flow in, decayed states and
-/// drum bursts flow out. Nothing here touches the network or the filesystem, which
-/// is what makes the state machine testable on its own.
+/// drum bursts flow out. Nothing here reaches for the network or the filesystem on
+/// its own — `decay` takes the one existence check it needs as a parameter — which
+/// is what keeps the state machine testable in isolation.
 @MainActor
 @Observable
 final class AgentRegistry {
@@ -25,8 +26,12 @@ final class AgentRegistry {
         visibleAgents.map(\.state).max { $0.priority < $1.priority } ?? .sleeping
     }
 
-    /// In single-cat mode the cat drums if anything at all is working.
-    var aggregateIsDrumming: Bool { visibleAgents.contains { $0.isDrumming } }
+    /// Anything on screen that moves: a burst in flight, or a busy agent tapping
+    /// between bursts. The overlay's animation timer runs exactly while this holds,
+    /// so an idle fleet still costs nothing.
+    var needsAnimation: Bool {
+        visibleAgents.contains { $0.isDrumming || $0.state.isBusy }
+    }
 
     func apply(_ event: HookEvent, now: Date = Date()) {
         guard let state = EventMapping.state(for: event) else { return }
@@ -51,10 +56,25 @@ final class AgentRegistry {
     }
 
     /// Ages states that have gone quiet and drops sessions long dead.
+    ///
     /// Called on a timer — decay is elapsed-time driven, not event driven, so
     /// nothing else would ever move an abandoned session off `working`.
-    func decay(now: Date = Date()) {
+    ///
+    /// `workspaceExists` is injected rather than called directly so the state
+    /// machine stays a pure function of its inputs under test. One `stat` per agent
+    /// per tick is far cheaper than the git calls `apply` already makes.
+    func decay(now: Date = Date(),
+               workspaceExists: (String) -> Bool = FileManager.default.fileExists(atPath:)) {
         for (id, agent) in agents {
+            // Archiving a Conductor workspace deletes its worktree directory, so a
+            // vanished path means the session cannot still be alive. It goes now
+            // rather than waiting out a decay it would never finish: `done`,
+            // `failed` and `needsInput` are exempt from ageing and so never reach
+            // the `sleeping` that the timed removal below requires.
+            if !agent.projectPath.isEmpty, !workspaceExists(agent.projectPath) {
+                agents[id] = nil
+                continue
+            }
             let elapsed = now.timeIntervalSince(agent.lastEventAt)
             if elapsed >= Self.removeAfter, agent.state == .sleeping {
                 agents[id] = nil
@@ -66,10 +86,17 @@ final class AgentRegistry {
         }
     }
 
-    /// Clears a "waiting for you" flag once the user has clearly moved on.
+    /// Clears a badge the user has now seen — a question, a finish, or an error —
+    /// and lets the session resume ordinary time-based decay.
     func acknowledge(_ sessionID: String) {
-        guard agents[sessionID]?.state.awaitsUser == true else { return }
+        guard agents[sessionID]?.state.persistsUntilSeen == true else { return }
         agents[sessionID]?.state = .idle
+    }
+
+    /// One cat stands for the whole fleet in single-cat mode, so a single click on
+    /// it has to clear every agent hiding behind that one badge.
+    func acknowledgeAll() {
+        for id in agents.keys { acknowledge(id) }
     }
 
     func removeAll() { agents.removeAll() }

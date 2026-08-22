@@ -30,9 +30,14 @@ enum AgentState: String, Codable, Sendable, CaseIterable {
     /// States the cat drums in. Everything else holds its paws still.
     var isBusy: Bool { self == .working || self == .delegating }
 
-    /// States that are waiting on the user rather than on the model — these keep
-    /// their badge until the user acts instead of decaying on a timer.
+    /// The agent itself is blocked on the user — it cannot progress until you
+    /// answer. Narrower than `persistsUntilSeen`: a finished agent needs nothing.
     var awaitsUser: Bool { self == .needsInput }
+
+    /// States that hold until the user acknowledges them instead of fading on a
+    /// timer. A question blocks the agent, and a finish or an error is a result you
+    /// have not read yet — all three are worthless if they vanish unseen.
+    var persistsUntilSeen: Bool { self == .needsInput || self == .done || self == .failed }
 }
 
 /// Live view of one agent session.
@@ -60,14 +65,15 @@ struct Agent: Identifiable, Sendable {
 /// How long a state survives without new events before it decays.
 ///
 /// Agents go quiet for two very different reasons — the model is slow, or the
-/// session is over — and only elapsed time tells them apart. Anything waiting on
-/// the *user* is exempt: it must persist until the user actually acts.
+/// session is over — and only elapsed time tells them apart. Anything the user has
+/// not seen yet is exempt: it persists until acknowledged, not until a timer runs
+/// out.
 enum StateDecay {
     static let toIdle: TimeInterval = 45
     static let toSleeping: TimeInterval = 15 * 60
 
     static func decayed(_ state: AgentState, silentFor elapsed: TimeInterval) -> AgentState {
-        if state.awaitsUser { return state }
+        if state.persistsUntilSeen { return state }
         if elapsed >= toSleeping { return .sleeping }
         if elapsed >= toIdle, state != .sleeping { return .idle }
         return state
