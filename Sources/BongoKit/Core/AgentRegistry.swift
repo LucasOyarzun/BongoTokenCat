@@ -68,7 +68,9 @@ final class AgentRegistry {
         for (id, agent) in agents {
             // Archiving a Conductor workspace deletes its worktree directory, so a
             // vanished path means the session cannot still be alive. It goes now
-            // rather than waiting out a decay it would never finish.
+            // rather than waiting out a decay it would never finish: `done`,
+            // `failed` and `needsInput` are exempt from ageing and so never reach
+            // the `sleeping` that the timed removal below requires.
             if !agent.projectPath.isEmpty, !workspaceExists(agent.projectPath) {
                 agents[id] = nil
                 continue
@@ -84,10 +86,17 @@ final class AgentRegistry {
         }
     }
 
-    /// Clears a "waiting for you" flag once the user has clearly moved on.
+    /// Clears a badge the user has now seen — a question, a finish, or an error —
+    /// and lets the session resume ordinary time-based decay.
     func acknowledge(_ sessionID: String) {
-        guard agents[sessionID]?.state.awaitsUser == true else { return }
+        guard agents[sessionID]?.state.persistsUntilSeen == true else { return }
         agents[sessionID]?.state = .idle
+    }
+
+    /// One cat stands for the whole fleet in single-cat mode, so a single click on
+    /// it has to clear every agent hiding behind that one badge.
+    func acknowledgeAll() {
+        for id in agents.keys { acknowledge(id) }
     }
 
     func removeAll() { agents.removeAll() }

@@ -113,7 +113,33 @@ func runAgentRegistryTests() {
                         "a quiet but never-ended session sleeps rather than vanishing")
         }
 
-        // Conductor deletes a workspace's worktree when you archive it.
+        test("clears a question once acknowledged") {
+            let registry = AgentRegistry()
+            registry.apply(registryEvent("Elicitation", session: "a"))
+
+            registry.acknowledge("a")
+
+            expectEqual(registry.agents["a"]?.state, .idle)
+        }
+
+        test("holds an error until it is acknowledged") {
+            let registry = AgentRegistry()
+            let start = Date()
+            registry.apply(registryEvent("StopFailure", session: "a"), now: start)
+
+            registry.decay(now: start.addingTimeInterval(31 * 60),
+                           workspaceExists: workspaceIsAlive)
+
+            expectEqual(registry.agents["a"]?.state, .failed, "an unseen error must not decay away")
+
+            registry.acknowledge("a")
+
+            expectEqual(registry.agents["a"]?.state, .idle)
+        }
+
+        // Conductor deletes a workspace's worktree when you archive it, and the
+        // states that hold for the user are exactly the ones that would otherwise
+        // never age their way to removal.
         test("drops a cat as soon as its workspace is archived") {
             let registry = AgentRegistry()
             registry.apply(registryEvent("StopFailure", session: "a"))
@@ -144,13 +170,15 @@ func runAgentRegistryTests() {
             expectEqual(registry.agents["a"]?.state, .done)
         }
 
-        test("clears a question once acknowledged") {
+        test("clears every badge behind the single cat at once") {
             let registry = AgentRegistry()
-            registry.apply(registryEvent("Elicitation", session: "a"))
+            registry.apply(registryEvent("Stop", session: "a"))
+            registry.apply(registryEvent("StopFailure", session: "b"))
 
-            registry.acknowledge("a")
+            registry.acknowledgeAll()
 
             expectEqual(registry.agents["a"]?.state, .idle)
+            expectEqual(registry.agents["b"]?.state, .idle)
         }
 
         // The animation timer is the app's only recurring cost, so what turns it on

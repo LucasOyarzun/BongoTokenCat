@@ -71,6 +71,12 @@ func runStateDecayTests() {
             expectEqual(StateDecay.decayed(.needsInput, silentFor: StateDecay.toSleeping * 2), .needsInput)
         }
 
+        // A result nobody read is a result nobody got. These hold until clicked.
+        test("never ages a result the user has not seen") {
+            expectEqual(StateDecay.decayed(.failed, silentFor: StateDecay.toSleeping * 2), .failed)
+            expectEqual(StateDecay.decayed(.done, silentFor: StateDecay.toSleeping * 2), .done)
+        }
+
         test("leaves a fresh state alone") {
             expectEqual(StateDecay.decayed(.working, silentFor: StateDecay.toIdle - 1), .working)
         }
@@ -87,6 +93,12 @@ func runStateDecayTests() {
         test("counts only producing states as busy") {
             expect(AgentState.working.isBusy && AgentState.delegating.isBusy, "work and delegation drum")
             expect(!AgentState.thinking.isBusy && !AgentState.idle.isBusy, "waiting does not drum")
+        }
+
+        test("marks exactly the states that wait to be seen") {
+            let waiting = AgentState.allCases.filter(\.persistsUntilSeen)
+
+            expectEqual(Set(waiting), Set([.needsInput, .done, .failed]))
         }
     }
 }
