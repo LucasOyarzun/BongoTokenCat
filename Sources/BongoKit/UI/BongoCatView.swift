@@ -8,7 +8,8 @@ struct BongoCatView: View {
     /// something else to rebuild the view.
     let drumsUntil: Date
     let now: Date
-    let skin: Skin
+    let instrument: Instrument
+    let coat: Coat
     let width: Double
     let label: String?
 
@@ -48,15 +49,16 @@ struct BongoCatView: View {
 
     private var artwork: some View {
         ZStack {
-            sprite("cat")
+            sprite(CatSprites.bodyName)
             sprite(PawPose.left(currentPaws))
             sprite(PawPose.right(currentPaws))
         }
         .frame(width: width, height: width * CatSprites.aspectRatio)
         // The body is filled white, so multiplying recolours the cat itself. This is
         // what the previous line-art sprites could not do: black strokes stay black
-        // under any multiplier.
-        .colorMultiply(skin.bodyColor)
+        // under any multiplier. It reaches the instrument too, which is the price of
+        // the artist having drawn both onto one canvas.
+        .colorMultiply(coat.bodyColor)
         .saturation(state == .failed ? 0 : 1)
         // Dimmed, not ghosted. At 0.55 a white cat all but vanished into a light
         // wallpaper; the `zzz` badge now carries the meaning, so the fade only has
@@ -82,7 +84,7 @@ struct BongoCatView: View {
     /// Layers share one canvas, so each simply fills the frame.
     @ViewBuilder
     private func sprite(_ name: String) -> some View {
-        if let image = CatSprites.image(named: name) {
+        if let image = CatSprites.image(instrument: instrument.id, named: name) {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)

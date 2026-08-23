@@ -141,7 +141,7 @@ final class OverlayController {
     /// drum deadlines are deliberately absent: those flow through observation.
     private func layoutSignature(columns: Int) -> String {
         let ids = registry.visibleAgents.map(\.id).joined(separator: ",")
-        return "\(settings.catMode.rawValue)|\(settings.skinID)|\(settings.catWidth)|\(settings.showsWorkspaceLabels)|\(columns)|\(ids)"
+        return "\(settings.catMode.rawValue)|\(settings.instrumentID)|\(settings.coatID)|\(settings.catWidth)|\(settings.showsWorkspaceLabels)|\(columns)|\(ids)"
     }
 
     private func currentGrid() -> OverlayLayout.Grid {

@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The two faces of the popover.
+/// The three faces of the popover.
 enum MenuTab: String, CaseIterable, Identifiable {
-    case agents, cat
+    case agents, cat, shop
 
     var id: String { rawValue }
 
@@ -10,12 +10,13 @@ enum MenuTab: String, CaseIterable, Identifiable {
         switch self {
         case .agents: return "Agents"
         case .cat:    return "Cat"
+        case .shop:   return "Shop"
         }
     }
 }
 
-/// The menu bar popover: a tab bar over what is running and how the cats look,
-/// with a footer that stays put whichever tab is open.
+/// The menu bar popover: a tab bar over what is running, how the cat looks, and
+/// what there is to buy — with a footer that stays put whichever tab is open.
 ///
 /// Tabs are a segmented control rather than a `TabView`: inside an `NSPopover` a
 /// `TabView` brings its own chrome and its own ideas about sizing, both of which
@@ -32,7 +33,7 @@ struct MenuContentView: View {
 
     /// Shared with the popover hosting this view, so the two cannot disagree about
     /// how much room the content needs.
-    static let preferredSize = CGSize(width: 320, height: 470)
+    static let preferredSize = CGSize(width: 320, height: 550)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,10 +73,10 @@ struct MenuContentView: View {
                        settings: settings,
                        onSettingsChanged: onSettingsChanged,
                        onResetPosition: onResetPosition)
+        case .shop:
+            MenuShopTab(model: model, settings: settings, onSettingsChanged: onSettingsChanged)
         }
     }
-
-    // MARK: - Footer
 
     private var footer: some View {
         HStack {

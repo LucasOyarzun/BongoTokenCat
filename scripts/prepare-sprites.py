@@ -1,29 +1,82 @@
 #!/usr/bin/env python3
-"""Turn bongocat-osu's taiko artwork into the sprites this app bundles.
+"""Turn bongocat-osu's artwork into the instrument sprites this app bundles.
 
-The source draws the cat on an opaque white desk, and its bongo photo carries a
-white background that hugs the drums. Both have to go for the overlay to sit on
+Four of its game modes are drawn on one canvas, with the same cat body and a
+different thing under its paws — which is exactly an instrument track. Each one
+becomes a folder of five sprites: the body it sits at, and its four paw poses.
+
+The source draws the cat on an opaque white desk, and taiko's bongo photo carries
+a white background that hugs the drums. Both have to go for the overlay to sit on
 the desktop without a panel behind it. Everything here is deterministic, so the
 committed PNGs can always be rebuilt:
 
     git clone --depth 1 https://github.com/kuroni/bongocat-osu /tmp/bongo-osu
-    python3 scripts/prepare-sprites.py /tmp/bongo-osu/img/taiko
+    python3 scripts/prepare-sprites.py /tmp/bongo-osu/img
 
 Requires Pillow (`pip install pillow`) — a build-time tool only, not a runtime
 dependency of the app.
 """
 
+import shutil
 import sys
 import pathlib
 from collections import deque
 from PIL import Image
 
-# Every layer shares this crop so the paws stay registered against the body.
+# Every layer of every mode shares this crop, so the paws stay registered against
+# the body and all four instruments come out the same size.
 CROP = (1, 19, 608, 354)
 OUT = pathlib.Path(__file__).resolve().parent.parent / "Sources/BongoKit/Resources/images"
 
-PAWS = [("leftup", "paw-left-up"), ("leftcentre", "paw-left-down"),
-        ("rightup", "paw-right-up"), ("rightcentre", "paw-right-down")]
+# `body` is the mode's backdrop; each paw is composited in order, so a mania paw
+# can carry the lit key it is pressing. `photo_backdrop` marks a mode whose art
+# includes a photo with a white background walled in by opaque shapes — true only
+# of taiko's drums. Running that step on the line-art modes would key out the white
+# faces of the keyboard along with it.
+INSTRUMENTS = {
+    "bongos": {
+        "body": "taiko/bg.png",
+        "photo_backdrop": True,
+        "paws": {
+            "paw-left-up": ["taiko/leftup.png"],
+            "paw-left-down": ["taiko/leftcentre.png"],
+            "paw-right-up": ["taiko/rightup.png"],
+            "paw-right-down": ["taiko/rightcentre.png"],
+        },
+    },
+    "keyboard4": {
+        "body": "mania/4K/bg.png",
+        "photo_backdrop": False,
+        "paws": {
+            "paw-left-up": ["mania/leftup.png"],
+            "paw-left-down": ["mania/4K/0.png", "mania/left0.png"],
+            "paw-right-up": ["mania/rightup.png"],
+            "paw-right-down": ["mania/4K/3.png", "mania/right0.png"],
+        },
+    },
+    "keyboard7": {
+        "body": "mania/7K/bg.png",
+        "photo_backdrop": False,
+        "paws": {
+            "paw-left-up": ["mania/leftup.png"],
+            "paw-left-down": ["mania/7K/0.png", "mania/left0.png"],
+            "paw-right-up": ["mania/rightup.png"],
+            "paw-right-down": ["mania/7K/6.png", "mania/right2.png"],
+        },
+    },
+    # catch's "paws" are a joystick and a button rather than two drums, so its down
+    # poses are a stick pushed over and a palm on the button.
+    "arcade": {
+        "body": "catch/bg.png",
+        "photo_backdrop": False,
+        "paws": {
+            "paw-left-up": ["catch/up.png"],
+            "paw-left-down": ["catch/dash.png"],
+            "paw-right-up": ["catch/mid.png"],
+            "paw-right-down": ["catch/left.png"],
+        },
+    },
+}
 
 
 def neighbours(x, y, w, h, diagonal=False):
@@ -80,8 +133,8 @@ def erase_desk(px, w, h):
 def erase_table_edge(px, w, h):
     """Drop the table edge: a short run per column with nothing above or below.
 
-    Anything belonging to the cat or a drum sits in a tall run, so run length
-    separates them without having to guess at colours.
+    Anything belonging to the cat or an instrument sits in a tall run, so run
+    length separates them without having to guess at colours.
     """
     opaque = lambda x, y: px[x, y][3] > 30
     for x in range(w):
@@ -100,11 +153,11 @@ def erase_table_edge(px, w, h):
 
 
 def erase_photo_background(px, w, h):
-    """Remove the bongo photo's white backdrop.
+    """Remove a photo's white backdrop.
 
-    It survives the desk flood because it is walled in by the drums, and it reads
-    as a white halo hugging their silhouette. The cat's body is white too, so the
-    largest white region is kept and every other one dropped.
+    It survives the desk flood because it is walled in by the photographed object,
+    and it reads as a white halo hugging the silhouette. The cat's body is white
+    too, so the largest white region is kept and every other one dropped.
     """
     white = lambda x, y: px[x, y][3] > 30 and min(px[x, y][:3]) >= 225
     regions = sorted(components(w, h, white), key=len, reverse=True)
@@ -142,34 +195,45 @@ def drop_debris(px, w, h, minimum=2500):
     return dropped
 
 
-def build_body(source):
-    image = Image.open(source / "bg.png").convert("RGBA")
+def stack(source, layers):
+    """Composite `layers` in order onto one transparent canvas."""
+    base = None
+    for layer in layers:
+        image = Image.open(source / layer).convert("RGBA")
+        if base is None:
+            base = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        base.alpha_composite(image)
+    return base
+
+
+def build_body(source, spec):
+    image = Image.open(source / spec["body"]).convert("RGBA")
     w, h = image.size
     px = image.load()
     erase_desk(px, w, h)
     erase_table_edge(px, w, h)
-    halo = erase_photo_background(px, w, h)
+    halo = erase_photo_background(px, w, h) if spec["photo_backdrop"] else 0
     fringe = erase_fringe(px, w, h)
     debris = drop_debris(px, w, h)
-    print(f"body: halo={halo}px fringe={fringe}px debris={debris} regions")
+    print(f"  body: halo={halo}px fringe={fringe}px debris={debris} regions")
     return image.crop(CROP)
 
 
 def main():
-    source = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/bongo-osu/img/taiko")
-    if not (source / "bg.png").exists():
-        sys.exit(f"no taiko artwork at {source}")
+    source = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/bongo-osu/img")
+    if not (source / "taiko/bg.png").exists():
+        sys.exit(f"no bongocat-osu artwork at {source}")
 
-    OUT.mkdir(parents=True, exist_ok=True)
-    for stale in OUT.glob("*.png"):
-        stale.unlink()
-
-    build_body(source).save(OUT / "cat.png")
-    for name, target in PAWS:
-        Image.open(source / f"{name}.png").convert("RGBA").crop(CROP).save(OUT / f"{target}.png")
-
-    for path in sorted(OUT.glob("*.png")):
-        print(f"  {path.name:20} {Image.open(path).size}  {path.stat().st_size // 1024}KB")
+    shutil.rmtree(OUT, ignore_errors=True)
+    for name, spec in INSTRUMENTS.items():
+        folder = OUT / name
+        folder.mkdir(parents=True)
+        print(name)
+        build_body(source, spec).save(folder / "cat.png")
+        for pose, layers in spec["paws"].items():
+            stack(source, layers).crop(CROP).save(folder / f"{pose}.png")
+        for path in sorted(folder.glob("*.png")):
+            print(f"    {path.name:20} {Image.open(path).size}  {path.stat().st_size // 1024}KB")
 
 
 if __name__ == "__main__":

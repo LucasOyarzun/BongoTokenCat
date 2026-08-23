@@ -26,7 +26,8 @@ struct OverlayView: View {
             // for "anything at all is producing".
             drumsUntil: registry.visibleAgents.map(\.drumsUntil).max() ?? .distantPast,
             now: clock.now,
-            skin: settings.skin,
+            instrument: settings.instrument,
+            coat: settings.coat,
             width: settings.catWidth,
             label: settings.showsWorkspaceLabels ? fleetLabel : nil
         )
@@ -43,7 +44,8 @@ struct OverlayView: View {
                             state: agent.state,
                             drumsUntil: agent.drumsUntil,
                             now: clock.now,
-                            skin: settings.skin,
+                            instrument: settings.instrument,
+                            coat: settings.coat,
                             width: settings.catWidth,
                             label: settings.showsWorkspaceLabels ? agent.label : nil
                         )

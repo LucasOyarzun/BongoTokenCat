@@ -2,48 +2,143 @@ import Foundation
 @testable import BongoKit
 
 @MainActor
-func runSkinCatalogTests() {
-    suite("Skin catalog") {
-        test("always unlocks the default skin") {
-            expect(SkinCatalog.isUnlocked(SkinCatalog.defaultSkin, lifetimeTokens: 0),
-                   "a brand new install must have something to show")
+func runInstrumentCatalogTests() {
+    suite("Instrument catalog") {
+        test("always unlocks the default instrument") {
+            expect(InstrumentCatalog.isUnlocked(InstrumentCatalog.defaultInstrument, lifetimeTokens: 0),
+                   "a brand new install must have something to play")
         }
 
-        test("keeps expensive skins locked") {
-            expectEqual(SkinCatalog.unlocked(lifetimeTokens: 2_000_000_000).map(\.id), ["white", "peach"])
+        test("keeps expensive instruments locked") {
+            expectEqual(InstrumentCatalog.unlocked(lifetimeTokens: 2_000_000_000).map(\.id),
+                        ["bongos", "keyboard4"])
         }
 
-        test("reports the cheapest locked skin as next up") {
-            expectEqual(SkinCatalog.nextLocked(lifetimeTokens: 2_000_000_000)?.id, "mint")
+        test("reports the cheapest locked instrument as next up") {
+            expectEqual(InstrumentCatalog.nextLocked(lifetimeTokens: 2_000_000_000)?.id, "keyboard7")
         }
 
-        test("reports no next skin once everything is unlocked") {
-            expectEqual(SkinCatalog.nextLocked(lifetimeTokens: 999_000_000_000)?.id, nil)
+        test("reports no next instrument once everything is unlocked") {
+            expectEqual(InstrumentCatalog.nextLocked(lifetimeTokens: 999_000_000_000)?.id, nil)
         }
 
         // Each unlock should start its bar empty rather than three quarters full,
         // which is what happens if progress is measured from zero.
         test("measures progress from the previous threshold") {
-            let mint = SkinCatalog.skin(id: "mint")   // 5B, previous tier 1B
+            let keyboard7 = InstrumentCatalog.instrument(id: "keyboard7")   // 5B, previous tier 1B
 
-            expectClose(SkinCatalog.progress(toward: mint, lifetimeTokens: 1_000_000_000), 0)
-            expectClose(SkinCatalog.progress(toward: mint, lifetimeTokens: 3_000_000_000), 0.5)
+            expectClose(InstrumentCatalog.progress(toward: keyboard7, lifetimeTokens: 1_000_000_000), 0)
+            expectClose(InstrumentCatalog.progress(toward: keyboard7, lifetimeTokens: 3_000_000_000), 0.5)
         }
 
         test("clamps progress into 0...1") {
-            let peach = SkinCatalog.skin(id: "peach")
+            let keyboard4 = InstrumentCatalog.instrument(id: "keyboard4")
 
-            expectClose(SkinCatalog.progress(toward: peach, lifetimeTokens: 0), 0)
-            expectClose(SkinCatalog.progress(toward: peach, lifetimeTokens: 99_000_000_000), 1)
+            expectClose(InstrumentCatalog.progress(toward: keyboard4, lifetimeTokens: 0), 0)
+            expectClose(InstrumentCatalog.progress(toward: keyboard4, lifetimeTokens: 99_000_000_000), 1)
         }
 
-        test("falls back to the default for an unknown skin id") {
-            expectEqual(SkinCatalog.skin(id: "does-not-exist").id, SkinCatalog.defaultSkin.id)
+        test("falls back to the default for an unknown instrument id") {
+            expectEqual(InstrumentCatalog.instrument(id: "does-not-exist").id,
+                        InstrumentCatalog.defaultInstrument.id)
         }
 
         test("orders thresholds ascending") {
-            let thresholds = SkinCatalog.all.map(\.tokensRequired)
+            let thresholds = InstrumentCatalog.all.map(\.tokensRequired)
             expectEqual(thresholds, thresholds.sorted(), "the unlock ladder must only go up")
+        }
+
+        // A missing folder shows up as a cat with no artwork at all, which is far
+        // easier to catch here than by staring at the desktop.
+        test("ships every sprite every instrument needs") {
+            let poses = [CatSprites.bodyName,
+                         PawPose.up.spriteName(side: "left"), PawPose.down.spriteName(side: "left"),
+                         PawPose.up.spriteName(side: "right"), PawPose.down.spriteName(side: "right")]
+
+            for instrument in InstrumentCatalog.all {
+                for pose in poses {
+                    expect(CatSprites.image(instrument: instrument.id, named: pose) != nil,
+                           "missing \(instrument.id)/\(pose).png")
+                }
+            }
+        }
+    }
+}
+
+@MainActor
+func runCoatShopTests() {
+    suite("Coat shop") {
+        test("gives away the coat the app ships with") {
+            expect(CoatShop.owns(CoatShop.defaultCoat, purchased: []), "a new install must have a cat to look at")
+        }
+
+        test("owns nothing else until it is bought") {
+            expect(!CoatShop.owns(CoatShop.coat(id: "gold"), purchased: []), "gold is not free")
+            expect(CoatShop.owns(CoatShop.coat(id: "gold"), purchased: ["gold"]), "a bought coat stays yours")
+        }
+
+        // Derived rather than stored, so the two can never disagree.
+        test("sums the price of what was bought") {
+            expectEqual(CoatShop.spent(purchased: ["peach", "mint"]), 2_000_000_000)
+        }
+
+        test("ignores purchases of coats that no longer exist") {
+            expectEqual(CoatShop.spent(purchased: ["peach", "retired-colour"]), 500_000_000)
+        }
+
+        test("leaves what was not spent") {
+            expectEqual(CoatShop.balance(lifetimeTokens: 3_000_000_000, purchased: ["peach"]),
+                        2_500_000_000)
+        }
+
+        // Prices can be edited between releases; an owned coat turning dearer should
+        // not read as debt.
+        test("never reports a negative balance") {
+            expectEqual(CoatShop.balance(lifetimeTokens: 100, purchased: ["gold"]), 0)
+        }
+
+        test("affords a coat the balance covers") {
+            expect(CoatShop.canAfford(CoatShop.coat(id: "mint"),
+                                      lifetimeTokens: 1_500_000_000, purchased: []),
+                   "exactly the price is enough")
+        }
+
+        test("refuses a coat the balance is one token short of") {
+            expect(!CoatShop.canAfford(CoatShop.coat(id: "mint"),
+                                       lifetimeTokens: 1_499_999_999, purchased: []),
+                   "one token short is short")
+        }
+
+        // The balance is what is left, not what was ever earned: buying twice in a
+        // row has to price the second coat against the first one's cost.
+        test("prices a second coat against what the first one cost") {
+            let lifetime = 1_900_000_000        // covers mint at 1.5B, but not twice over
+
+            expect(CoatShop.canAfford(CoatShop.coat(id: "mint"), lifetimeTokens: lifetime, purchased: []),
+                   "1.9B covers mint on its own")
+            expect(!CoatShop.canAfford(CoatShop.coat(id: "mint"),
+                                       lifetimeTokens: lifetime, purchased: ["peach"]),
+                   "500M spent on peach must put mint out of reach")
+        }
+
+        test("cannot buy what is already owned") {
+            expect(!CoatShop.canAfford(CoatShop.coat(id: "peach"),
+                                       lifetimeTokens: 999_000_000_000, purchased: ["peach"]),
+                   "no amount of balance makes an owned coat buyable again")
+        }
+
+        test("falls back to the default for an unknown coat id") {
+            expectEqual(CoatShop.coat(id: "does-not-exist").id, CoatShop.defaultCoat.id)
+        }
+
+        // Instruments are earned and coats are bought, so the two ladders should not
+        // compete: owning every coat has to stay a goal past the last instrument.
+        test("keeps the full wardrobe dearer than the last instrument") {
+            let wardrobe = CoatShop.all.reduce(0) { $0 + $1.price }
+            let lastInstrument = InstrumentCatalog.all.map(\.tokensRequired).max() ?? 0
+
+            expect(wardrobe > lastInstrument,
+                   "\(wardrobe) must outlast \(lastInstrument) or the shop empties first")
         }
     }
 }

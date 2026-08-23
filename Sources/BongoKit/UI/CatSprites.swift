@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The cat artwork: a filled white body plus one image per paw pose.
+/// The cat artwork: a filled white body plus one image per paw pose, in one folder
+/// per instrument.
 ///
 /// The first attempt used bongo.cat's own art, which is line work with a
 /// transparent interior — it only reads as a white cat because that page has a
@@ -9,8 +10,8 @@ import SwiftUI
 /// sprites come from bongocat-osu instead, where the body is already filled, and
 /// were pre-processed once to strip the opaque white desk behind it.
 ///
-/// Every layer shares one canvas, so they stack with no offsets: draw the body,
-/// then each paw.
+/// Every layer of every instrument shares one canvas, so they stack with no
+/// offsets: draw the body, then each paw. Swapping instrument is swapping folder.
 enum CatSprites {
     static let stageSize = CGSize(width: 607, height: 335)
 
@@ -21,16 +22,20 @@ enum CatSprites {
     @MainActor private static var cache: [String: NSImage] = [:]
 
     @MainActor
-    static func image(named name: String) -> NSImage? {
-        if let cached = cache[name] { return cached }
-        guard let url = Bundle.module.url(forResource: "images/\(name)", withExtension: "png"),
+    static func image(instrument: String, named name: String) -> NSImage? {
+        let path = "\(instrument)/\(name)"
+        if let cached = cache[path] { return cached }
+        guard let url = Bundle.module.url(forResource: "images/\(path)", withExtension: "png"),
               let image = NSImage(contentsOf: url) else {
-            AppLog.write("missing sprite: \(name).png")
+            AppLog.write("missing sprite: \(path).png")
             return nil
         }
-        cache[name] = image
+        cache[path] = image
         return image
     }
+
+    /// Sprite name of the body every instrument ships.
+    static let bodyName = "cat"
 }
 
 /// One paw's pose. Each maps to its own image rather than to an offset into a

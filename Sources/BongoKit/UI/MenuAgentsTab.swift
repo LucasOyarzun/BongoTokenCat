@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What is running right now, and what the tokens it burned have unlocked.
+/// What is running right now, and what the tokens it burned have bought you.
 struct MenuAgentsTab: View {
     let model: AppModel
     let registry: AgentRegistry
@@ -42,14 +42,16 @@ struct MenuAgentsTab: View {
                 Spacer()
                 if model.isScanning { ProgressView().controlSize(.small) }
             }
-            HStack {
+            HStack(alignment: .top, spacing: 0) {
                 stat("Today", TokenFormatter.compact(model.totals.today))
-                Spacer()
+                Spacer(minLength: 8)
                 stat("All time", TokenFormatter.compact(model.totals.lifetime))
+                Spacer(minLength: 8)
+                stat("To spend", TokenFormatter.compact(model.balance))
             }
-            if let next = model.nextSkin {
+            if let next = model.nextInstrument {
                 VStack(alignment: .leading, spacing: 3) {
-                    ProgressView(value: model.progressTowardNextSkin())
+                    ProgressView(value: model.progressTowardNextInstrument())
                     Text("Next: \(next.name) at \(TokenFormatter.compact(next.tokensRequired))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// How the cats look and where they sit, plus the skins they unlock.
+/// How the cats look and where they sit, plus the instrument track they earn.
 struct MenuCatTab: View {
     let model: AppModel
     @Bindable var settings: Settings
@@ -11,7 +11,7 @@ struct MenuCatTab: View {
         VStack(alignment: .leading, spacing: 14) {
             appearanceSection
             Divider()
-            skinsSection
+            instrumentsSection
         }
     }
 
@@ -56,39 +56,81 @@ struct MenuCatTab: View {
         }
     }
 
-    // MARK: - Skins
+    // MARK: - Instruments
 
-    private var skinsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Skins").font(.headline)
-            ForEach(SkinCatalog.all) { skin in
-                skinRow(skin)
+    private var instrumentsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Instruments").font(.headline)
+            Text("Earned by working. Nothing to spend.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            ForEach(InstrumentCatalog.all) { instrument in
+                instrumentRow(instrument)
             }
         }
     }
 
-    private func skinRow(_ skin: Skin) -> some View {
-        let unlocked = model.isUnlocked(skin)
-        let selected = settings.skinID == skin.id
+    private func instrumentRow(_ instrument: Instrument) -> some View {
+        let unlocked = model.isUnlocked(instrument)
+        let selected = settings.instrumentID == instrument.id
         return Button {
             guard unlocked else { return }
-            settings.skinID = skin.id
+            settings.instrumentID = instrument.id
             onSettingsChanged()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
+                InstrumentPreview(instrument: instrument, coat: settings.coat, isUnlocked: unlocked)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(instrument.name).font(.callout)
+                    if !unlocked {
+                        Text("Unlocks at \(TokenFormatter.compact(instrument.tokensRequired))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
                 Image(systemName: unlocked ? (selected ? "largecircle.fill.circle" : "circle") : "lock.fill")
                     .foregroundStyle(unlocked ? Color.accentColor : .secondary)
-                Text(skin.name)
-                Spacer()
-                if !unlocked {
-                    Text(TokenFormatter.compact(skin.tokensRequired))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!unlocked)
+        .accessibilityLabel(unlocked ? instrument.name
+                                     : "\(instrument.name), locked until \(TokenFormatter.compact(instrument.tokensRequired)) tokens")
+    }
+}
+
+/// A still of the cat mid-strike, so the row shows what the instrument actually
+/// looks like rather than naming it and hoping.
+private struct InstrumentPreview: View {
+    let instrument: Instrument
+    let coat: Coat
+    let isUnlocked: Bool
+
+    private static let width: Double = 76
+
+    var body: some View {
+        ZStack {
+            sprite(CatSprites.bodyName)
+            sprite(PawPose.down.spriteName(side: "left"))
+            sprite(PawPose.down.spriteName(side: "right"))
+        }
+        .frame(width: Self.width, height: Self.width * CatSprites.aspectRatio)
+        // Locked instruments go grey rather than hidden: the point of the ladder is
+        // seeing what is coming.
+        .colorMultiply(isUnlocked ? coat.bodyColor : .white)
+        .saturation(isUnlocked ? 1 : 0)
+        .opacity(isUnlocked ? 1 : 0.4)
+    }
+
+    @ViewBuilder
+    private func sprite(_ name: String) -> some View {
+        if let image = CatSprites.image(instrument: instrument.id, named: name) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+        }
     }
 }

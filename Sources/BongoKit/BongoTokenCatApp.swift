@@ -22,8 +22,8 @@ public enum BongoTokenCat {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let registry = AgentRegistry()
-    private let settings = Settings()
-    private let model = AppModel()
+    private let settings: Settings
+    private let model: AppModel
 
     private var overlay: OverlayController!
     private var server: HookServer?
@@ -36,6 +36,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// events — an abandoned session emits nothing by definition.
     private static let decayInterval: TimeInterval = 5
     private static let usageInterval: TimeInterval = 5 * 60
+
+    /// Built here rather than from property defaults because the model spends from
+    /// the same settings the menu writes to, and one of them has to exist first.
+    override init() {
+        let settings = Settings()
+        self.settings = settings
+        self.model = AppModel(settings: settings)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         overlay = OverlayController(registry: registry, settings: settings)

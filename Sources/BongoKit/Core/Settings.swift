@@ -24,8 +24,11 @@ final class Settings {
     var catMode: CatMode {
         didSet { defaults.set(catMode.rawValue, forKey: Keys.catMode) }
     }
-    var skinID: String {
-        didSet { defaults.set(skinID, forKey: Keys.skinID) }
+    var instrumentID: String {
+        didSet { defaults.set(instrumentID, forKey: Keys.instrumentID) }
+    }
+    var coatID: String {
+        didSet { defaults.set(coatID, forKey: Keys.coatID) }
     }
     var catWidth: Double {
         didSet { defaults.set(catWidth, forKey: Keys.catWidth) }
@@ -37,13 +40,21 @@ final class Settings {
         didSet { defaults.set(showsWorkspaceLabels, forKey: Keys.showsWorkspaceLabels) }
     }
 
+    /// Coats bought from the shop. Only ever added to — a coat you paid for stays
+    /// yours, and the balance it cost comes back as the lifetime count grows.
+    private(set) var purchasedCoatIDs: Set<String> {
+        didSet { defaults.set(Array(purchasedCoatIDs), forKey: Keys.purchasedCoatIDs) }
+    }
+
     /// Where the user dragged the cats to. `nil` means "keep the default corner",
     /// which is also what Reset position restores.
     private(set) var overlayOrigin: CGPoint?
 
     private enum Keys {
         static let catMode = "catMode"
-        static let skinID = "skinID"
+        static let instrumentID = "instrumentID"
+        static let coatID = "coatID"
+        static let purchasedCoatIDs = "purchasedCoatIDs"
         static let catWidth = "catWidth"
         static let showsOverlay = "showsOverlay"
         static let showsWorkspaceLabels = "showsWorkspaceLabels"
@@ -60,7 +71,9 @@ final class Settings {
 
     init() {
         catMode = CatMode(rawValue: defaults.string(forKey: Keys.catMode) ?? "") ?? .perAgent
-        skinID = defaults.string(forKey: Keys.skinID) ?? SkinCatalog.defaultSkin.id
+        instrumentID = defaults.string(forKey: Keys.instrumentID) ?? InstrumentCatalog.defaultInstrument.id
+        coatID = defaults.string(forKey: Keys.coatID) ?? CoatShop.defaultCoat.id
+        purchasedCoatIDs = Set(defaults.stringArray(forKey: Keys.purchasedCoatIDs) ?? [])
         catWidth = defaults.object(forKey: Keys.catWidth) as? Double ?? Self.defaultCatWidth
         showsOverlay = defaults.object(forKey: Keys.showsOverlay) as? Bool ?? true
         showsWorkspaceLabels = defaults.object(forKey: Keys.showsWorkspaceLabels) as? Bool ?? true
@@ -68,6 +81,10 @@ final class Settings {
             overlayOrigin = CGPoint(x: defaults.double(forKey: Keys.originX),
                                     y: defaults.double(forKey: Keys.originY))
         }
+    }
+
+    func recordPurchase(of coat: Coat) {
+        purchasedCoatIDs.insert(coat.id)
     }
 
     func moveOverlay(to origin: CGPoint) {
@@ -82,5 +99,6 @@ final class Settings {
         defaults.set(false, forKey: Keys.hasCustomPosition)
     }
 
-    var skin: Skin { SkinCatalog.skin(id: skinID) }
+    var instrument: Instrument { InstrumentCatalog.instrument(id: instrumentID) }
+    var coat: Coat { CoatShop.coat(id: coatID) }
 }
