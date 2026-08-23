@@ -69,8 +69,15 @@ build_and_package() {
 
 publish_release() {
     echo "==> pushing v$VERSION"
-    git add scripts/build-app.sh
-    git commit -q -m "release: bump version to $VERSION"
+    # The bump is a no-op when build-app.sh already names this version — the first
+    # release, or a rerun after a later step failed. Committing an empty stage exits
+    # non-zero and would abort the release under `set -e`.
+    if git diff --quiet -- scripts/build-app.sh; then
+        echo "    version already recorded, nothing to commit"
+    else
+        git add scripts/build-app.sh
+        git commit -q -m "release: bump version to $VERSION"
+    fi
     git push -q origin main
 
     local notes_args=(--notes "Release v$VERSION")
