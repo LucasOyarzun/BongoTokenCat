@@ -5,7 +5,8 @@
 # It lives here rather than only in the tap so the `zap` paths can be updated in
 # the same commit as the code that starts writing them.
 #
-# Version and sha256 below are placeholders — release.sh overwrites both.
+# In this copy the version and sha256 are placeholders; the copy in the tap has
+# the real ones stamped in.
 cask "bongo-token-cat" do
   version "0.0.0"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
@@ -15,7 +16,9 @@ cask "bongo-token-cat" do
   desc "Menu bar app giving every coding agent a bongo cat that drums to its output"
   homepage "https://github.com/LucasOyarzun/BongoTokenCat"
 
-  depends_on macos: ">= :sonoma"
+  # The bare symbol already means "this version or newer". The ">= :sonoma" string
+  # form Homebrew deprecated printed a warning on every install.
+  depends_on macos: :sonoma
 
   app "BongoTokenCat.app"
 
