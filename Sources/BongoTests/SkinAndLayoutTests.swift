@@ -83,17 +83,26 @@ func runOverlayLayoutTests() {
             expectClose(withLabel.height - without.height, OverlayLayout.labelHeight)
         }
 
-        test("anchors to the requested corner") {
+        // Dragging overrides this and sticks, so the corner is only ever a starting
+        // point — but it has to be inset from the edge or the first cat is clipped.
+        test("starts in the bottom right, inset from the edge") {
             let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
             let size = CGSize(width: 200, height: 100)
 
-            let bottomRight = OverlayLayout.origin(for: size, in: screen, anchor: .bottomTrailing)
-            let topLeft = OverlayLayout.origin(for: size, in: screen, anchor: .topLeading)
+            let origin = OverlayLayout.defaultOrigin(for: size, in: screen)
 
-            expectClose(bottomRight.x, 1000 - 200 - 16)
-            expectClose(bottomRight.y, 16)
-            expectClose(topLeft.x, 16)
-            expectClose(topLeft.y, 800 - 100 - 16)
+            expectClose(origin.x, 1000 - 200 - 16)
+            expectClose(origin.y, 16)
+        }
+
+        test("keeps the default corner inside a screen that does not start at zero") {
+            let secondScreen = CGRect(x: 1512, y: -200, width: 1000, height: 800)
+            let size = CGSize(width: 200, height: 100)
+
+            let origin = OverlayLayout.defaultOrigin(for: size, in: secondScreen)
+
+            expect(origin.x >= secondScreen.minX, "must not sit off the left of its own screen")
+            expectClose(origin.y, -200 + 16)
         }
     }
 }

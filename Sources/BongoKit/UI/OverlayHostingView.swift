@@ -55,8 +55,9 @@ final class OverlayHostingView<Content: View>: NSHostingView<Content> {
         defer { grabPoint = nil; windowOrigin = nil; pressedIndex = nil }
         guard let window, let grabPoint else { return }
         let travelled = NSEvent.mouseLocation.distance(to: grabPoint)
-        // Reporting a click as a move would pin an anchored overlay to a manual
-        // position it never asked for, so the two paths stay exclusive.
+        // Reporting a click as a move would pin an overlay still following the
+        // default corner to a position it never asked for, so the two paths stay
+        // exclusive.
         guard travelled >= dragThreshold else {
             if let pressedIndex { onTapped?(pressedIndex) }
             return

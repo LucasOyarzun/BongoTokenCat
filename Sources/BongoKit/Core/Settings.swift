@@ -16,20 +16,6 @@ enum CatMode: String, Codable, Sendable, CaseIterable {
     }
 }
 
-/// Where the row of cats sits on screen.
-enum OverlayAnchor: String, Codable, Sendable, CaseIterable {
-    case bottomLeading, bottomTrailing, topLeading, topTrailing
-
-    var label: String {
-        switch self {
-        case .bottomLeading:  return "Bottom left"
-        case .bottomTrailing: return "Bottom right"
-        case .topLeading:     return "Top left"
-        case .topTrailing:    return "Top right"
-        }
-    }
-}
-
 @MainActor
 @Observable
 final class Settings {
@@ -44,9 +30,6 @@ final class Settings {
     var catWidth: Double {
         didSet { defaults.set(catWidth, forKey: Keys.catWidth) }
     }
-    var anchor: OverlayAnchor {
-        didSet { defaults.set(anchor.rawValue, forKey: Keys.anchor) }
-    }
     var showsOverlay: Bool {
         didSet { defaults.set(showsOverlay, forKey: Keys.showsOverlay) }
     }
@@ -54,7 +37,7 @@ final class Settings {
         didSet { defaults.set(showsWorkspaceLabels, forKey: Keys.showsWorkspaceLabels) }
     }
 
-    /// Where the user dragged the cats to. `nil` means "keep following `anchor`",
+    /// Where the user dragged the cats to. `nil` means "keep the default corner",
     /// which is also what Reset position restores.
     private(set) var overlayOrigin: CGPoint?
 
@@ -62,7 +45,6 @@ final class Settings {
         static let catMode = "catMode"
         static let skinID = "skinID"
         static let catWidth = "catWidth"
-        static let anchor = "anchor"
         static let showsOverlay = "showsOverlay"
         static let showsWorkspaceLabels = "showsWorkspaceLabels"
         static let hasCustomPosition = "hasCustomPosition"
@@ -80,7 +62,6 @@ final class Settings {
         catMode = CatMode(rawValue: defaults.string(forKey: Keys.catMode) ?? "") ?? .perAgent
         skinID = defaults.string(forKey: Keys.skinID) ?? SkinCatalog.defaultSkin.id
         catWidth = defaults.object(forKey: Keys.catWidth) as? Double ?? Self.defaultCatWidth
-        anchor = OverlayAnchor(rawValue: defaults.string(forKey: Keys.anchor) ?? "") ?? .bottomTrailing
         showsOverlay = defaults.object(forKey: Keys.showsOverlay) as? Bool ?? true
         showsWorkspaceLabels = defaults.object(forKey: Keys.showsWorkspaceLabels) as? Bool ?? true
         if defaults.bool(forKey: Keys.hasCustomPosition) {

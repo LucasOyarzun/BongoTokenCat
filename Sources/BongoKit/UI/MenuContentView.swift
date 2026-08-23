@@ -147,11 +147,6 @@ struct MenuContentView: View {
             Toggle("Label with workspace", isOn: $settings.showsWorkspaceLabels)
                 .onChange(of: settings.showsWorkspaceLabels) { _, _ in onSettingsChanged() }
 
-            Picker("Corner", selection: $settings.anchor) {
-                ForEach(OverlayAnchor.allCases, id: \.self) { Text($0.label).tag($0) }
-            }
-            .onChange(of: settings.anchor) { _, _ in onSettingsChanged() }
-
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text("Size").font(.caption).foregroundStyle(.secondary)
