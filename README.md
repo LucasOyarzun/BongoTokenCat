@@ -1,10 +1,15 @@
-# BongoTokenBar
+# BongoTokenCat
+
+[![CI](https://github.com/LucasOyarzun/BongoTokenCat/actions/workflows/ci.yml/badge.svg)](https://github.com/LucasOyarzun/BongoTokenCat/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/LucasOyarzun/BongoTokenCat)](https://github.com/LucasOyarzun/BongoTokenCat/releases/latest)
+[![License](https://img.shields.io/github/license/LucasOyarzun/BongoTokenCat)](LICENSE)
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)
 
 A Bongo Cat for every coding agent you have running. The paws drum in time with
 what each agent is actually producing, so a glance at the corner of the screen
 tells you who is working, who is stuck, and who is waiting on you.
 
-macOS menu bar app. Swift 6 + SwiftUI, no dependencies, personal use.
+macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
 
 ## What it does
 
@@ -13,8 +18,8 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies, personal use.
 - **The rhythm is the signal.** Cats drum while their agent streams output, and tap
   slowly between bursts so a working agent never looks like a stopped one. A busy
   row looks busy.
-- **Badges for what the paws cannot say**: `…` thinking, `zzz` asleep, `?` waiting
-  for you, `!` error, `✓` done. Working and delegating need none — the rhythm
+- **Badges for what the paws cannot say**: `…` thinking, `zzz` sleeping, `?` needs
+  input, `!` failed, `✓` done. Working and delegating need none — the rhythm
   carries it.
 - **Click a cat to dismiss its badge.** `…` fades on its own, but `?`, `!` and `✓`
   hold until you have actually looked at them.
@@ -25,20 +30,22 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies, personal use.
 
 ### States
 
-| Hook event | State | Cat |
-|---|---|---|
-| `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming, slow tap between bursts |
-| `PreToolUse(Task)` / `SubagentStart` | delegating | same as working |
-| `UserPromptSubmit` | thinking | paws up, `…` |
-| `Notification` / `Elicitation` | waiting for you | one paw raised, `?` |
-| `Stop` | done | paws up, `✓` |
-| `StopFailure` / `PostToolUseFailure` | error | slumped, `!` |
-| `SessionStart`, or 45s silent | idle | paws up, no badge |
-| `SessionEnd`, or 15 min silent | asleep | dimmed, paws down, `zzz` |
+![The eight cat states, left to right: sleeping, idle, thinking, working, delegating, done, needs input, failed](assets/states.png)
 
-States age on their own: 45s silent drops to idle, 15 min to asleep, 30 min after
+| | Hook event | State | Cat |
+|---|---|---|---|
+| 1 | `SessionEnd`, or 15 min silent | sleeping | dimmed, paws down, `zzz` |
+| 2 | `SessionStart`, or 45s silent | idle | paws up, no badge |
+| 3 | `UserPromptSubmit` | thinking | paws up, `…` |
+| 4 | `PreToolUse` / `PostToolUse` / `MessageDisplay` | working | drumming, slow tap between bursts |
+| 5 | `PreToolUse(Task)` / `SubagentStart` | delegating | same as working |
+| 6 | `Stop` | done | paws up, `✓` |
+| 7 | `Notification` / `Elicitation` | needs input | one paw raised, `?` |
+| 8 | `StopFailure` / `PostToolUseFailure` | failed | slumped, `!` |
+
+States age on their own: 45s silent drops to idle, 15 min to sleeping, 30 min after
 a session ends the cat disappears. The three states that carry something for *you*
-— a question, a finish, an error — never age out; click the cat to clear them.
+— a question, a finish, a failure — never age out; click the cat to clear them.
 
 Archiving a Conductor workspace deletes its worktree, and a cat whose directory is
 gone is dropped on the next tick whatever state it was in. Without that the three
@@ -47,14 +54,38 @@ leave a cat behind for good.
 
 ## Install
 
-Requires macOS 14+ and a Swift toolchain (Command Line Tools is enough).
+Requires **macOS 14 (Sonoma) or later** and Claude Code.
+
+### Homebrew
 
 ```bash
-./scripts/build-app.sh
-open build/BongoTokenBar.app
+brew install --cask LucasOyarzun/tap/bongo-token-cat
+open -a BongoTokenCat
 ```
 
 Then open the menu bar icon and press **Install hooks**.
+
+Updating is `brew upgrade --cask bongo-token-cat`. Uninstalling is
+`brew uninstall --zap --cask bongo-token-cat` — but press **Remove hooks** in the
+menu first, because Homebrew will not touch your `~/.claude/settings.json`.
+
+> **On code signing.** Releases are signed ad-hoc, not with a paid Apple Developer
+> certificate, so macOS would normally quarantine the app. The cask clears the
+> quarantine attribute on install, which is why this is one step and not a
+> right-click-Open dance. If you would rather not take that on trust, build from
+> source — it is two commands.
+
+### From source
+
+Needs a Swift toolchain; Xcode Command Line Tools is enough
+(`xcode-select --install`).
+
+```bash
+git clone https://github.com/LucasOyarzun/BongoTokenCat
+cd BongoTokenCat
+./scripts/build-app.sh
+open build/BongoTokenCat.app
+```
 
 ### About the hooks
 
@@ -62,7 +93,7 @@ The app cannot see your agents until Claude Code is told to notify it. Installin
 registers a hook command in `~/.claude/settings.json`.
 
 It **merges**: entries are matched by our own script path, so existing hooks are
-left alone, and a timestamped backup is written to `~/.bongotokenbar/` before any
+left alone, and a timestamped backup is written to `~/.bongotokencat/` before any
 write. **Remove hooks** in the menu takes only ours back out.
 
 The hook itself is a three-line shell script that pipes the payload to a localhost
@@ -83,9 +114,9 @@ work: one strike every eight seconds reads as broken.
 ## Development
 
 ```bash
-./scripts/test.sh                                   # 78 tests
+./scripts/test.sh                                   # 89 tests
 ./scripts/send-test-event.sh Stop demo /tmp/proj    # fake an event
-tail -f ~/.bongotokenbar/bongotokenbar.log
+tail -f ~/.bongotokencat/bongotokencat.log
 ```
 
 Logic lives in `BongoKit`; the executable is a six-line shim so the tests can
@@ -103,7 +134,7 @@ per-file totals keyed by size and modification time. Later scans re-read only wh
 changed — about 2s. Per-file dedup is used rather than global; measured on a real
 history the two produce an identical total.
 
-## Labels
+### Labels
 
 A cat is labelled with its **git branch**, not its folder. Conductor names a
 workspace folder independently of the branch (`cebu-v2`), so the folder tells you
@@ -114,32 +145,55 @@ Git is read directly from `.git` rather than by shelling out — Conductor works
 are worktrees, so the `gitdir:` pointer is the normal case here. Results are cached
 for 30s so a burst of hook events costs one lookup.
 
+### Releasing
+
+```bash
+./scripts/release.sh 0.2.0
+```
+
+Tests, bumps `VERSION` in `scripts/build-app.sh` (the single source of truth for
+the version), builds, zips, pushes, cuts a GitHub Release, and stamps the new
+version and checksum into the cask in
+[`LucasOyarzun/homebrew-tap`](https://github.com/LucasOyarzun/homebrew-tap).
+Everything that can fail runs before the push, so a failed build leaves
+`origin/main` untouched.
+
+The cask's source of truth is [`packaging/homebrew/bongo-token-cat.rb`](packaging/homebrew/bongo-token-cat.rb)
+— it lives here so its `zap` paths can be updated in the same commit as the code
+that starts writing them.
+
+## Contributing
+
+Issues and pull requests are welcome. `./scripts/test.sh` has to pass; CI runs it
+on every PR along with a release build.
+
 ## Credits
 
 Bongo Cat is by **[@StrayRogue](https://twitter.com/strayrogue)** (the cat drawing)
-and **[@DitzyFlama](https://twitter.com/ditzyflama)** (the original meme).
+and **[@DitzyFlama](https://twitter.com/ditzyflama)** (the original meme). Per the
+[Bongo Cat FAQ](https://bongocat.carrd.co/), reuse is fine as long as the original
+artist is credited and linked — **please keep the credit if you fork this.**
 
-The sprites here are from [bongocat-osu](https://github.com/kuroni/bongocat-osu)
+The sprites are derived from [bongocat-osu](https://github.com/kuroni/bongocat-osu)
 (MIT) — its taiko set, which has a filled white body and one image per paw pose.
-`scripts/prepare-sprites.py` turns that artwork into what the app bundles: it keys
-out the opaque white desk behind the cat and the white backdrop baked into the
-bongo photo, so the overlay sits on the desktop with nothing behind it. Rerun it
-against a fresh clone to rebuild the PNGs.
+`scripts/prepare-sprites.py` keys out the opaque white desk behind the cat and the
+white backdrop baked into the bongo photo, so the overlay sits on the desktop with
+nothing behind it. Rerun it against a fresh clone to rebuild the PNGs.
 
 [bongo.cat](https://github.com/Externalizable/bongo.cat) (MIT) was the first source
 tried. Its art is line work with a transparent interior — it only reads as a white
 cat because that page has a white background, and the outline is open, so there is
 no enclosed region to fill.
 
-Please keep the credit if you fork this. Per the
-[Bongo Cat FAQ](https://bongocat.carrd.co/), reuse is fine as long as the original
-artist is credited and linked.
-
 The idea of driving a desktop pet from Claude Code hooks comes from
-[LLMPET](https://github.com/myunwang/LLMPET) (MIT); the token-tracking approach
-from [PokeTokenBar](https://github.com/chattymin/PokeTokenBar) (MIT). No code from
+[LLMPET](https://github.com/myunwang/LLMPET) (MIT); the token-tracking approach and
+the Homebrew tap release setup from
+[PokeTokenBar](https://github.com/chattymin/PokeTokenBar) (MIT). No code from
 either is copied here.
+
+Full attributions and licence texts: [NOTICE.md](NOTICE.md).
 
 ## License
 
-MIT for the code. The Bongo Cat artwork remains StrayRogue's.
+[MIT](LICENSE) for the code. The Bongo Cat artwork remains StrayRogue's — see
+[NOTICE.md](NOTICE.md).

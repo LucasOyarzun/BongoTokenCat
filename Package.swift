@@ -7,7 +7,7 @@ import PackageDescription
 // `.testTarget`. Everything they exercise lives in BongoKit; the app executable is
 // a six-line shim.
 let package = Package(
-    name: "BongoTokenBar",
+    name: "BongoTokenCat",
     platforms: [.macOS(.v14)],
     targets: [
         .target(
@@ -16,9 +16,9 @@ let package = Package(
             resources: [.copy("Resources/images")]
         ),
         .executableTarget(
-            name: "BongoTokenBar",
+            name: "BongoTokenCat",
             dependencies: ["BongoKit"],
-            path: "Sources/BongoTokenBar"
+            path: "Sources/BongoTokenCat"
         ),
         .executableTarget(
             name: "BongoTests",

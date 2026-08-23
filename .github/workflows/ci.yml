@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same PR makes the first run pointless; cancel it rather
+# than queue behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: swift --version
+
+      # The suite is pure Foundation — no AppKit, no window server — so it runs
+      # headless on a CI runner exactly as it does locally.
+      - name: Test
+        run: ./scripts/test.sh
+
+      # Compiling the SwiftUI target is not covered by the tests (they only link
+      # BongoKit's logic), so the release build is its own gate.
+      - name: Build app bundle
+        run: ./scripts/build-app.sh

@@ -147,9 +147,9 @@ enum HookInstaller {
     private static func writeScript() throws {
         let script = """
         #!/bin/sh
-        # BongoTokenBar hook — forwards the Claude Code hook payload to the running app.
+        # BongoTokenCat hook — forwards the Claude Code hook payload to the running app.
         # Never fails, never blocks: the app is optional, the user's session is not.
-        RUNTIME="$HOME/.bongotokenbar/runtime.json"
+        RUNTIME="$HOME/.bongotokencat/runtime.json"
         [ -f "$RUNTIME" ] || exit 0
         PORT=$(sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\\([0-9]*\\).*/\\1/p' "$RUNTIME")
         TOKEN=$(sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\\([a-f0-9]*\\)".*/\\1/p' "$RUNTIME")
