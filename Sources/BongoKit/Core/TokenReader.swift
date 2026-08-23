@@ -184,4 +184,10 @@ enum TokenFormatter {
         }
         return "\(value)"
     }
+
+    /// Whole percents. The endpoint reports fractions, but a tenth of a percent of a
+    /// weekly quota is noise the eye has to skip past on every read.
+    static func percent(_ value: Double) -> String {
+        String(format: "%.0f%%", value.rounded())
+    }
 }
