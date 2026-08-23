@@ -23,10 +23,17 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
   carries it.
 - **Click a cat to dismiss its badge.** `…` fades on its own, but `?`, `!` and `✓`
   hold until you have actually looked at them.
-- **Skins unlock with tokens spent.** Six coat colours, from plain white at zero to
-  gold at 100B.
+- **Instruments unlock with tokens spent.** Four, from bongos at zero to a full
+  arcade cabinet at 15B. Free — passing the threshold is the whole transaction.
+- **Coats are bought, not earned.** Six colours priced from 500M to 25B, against a
+  balance of every token you have ever spent, less what you have spent here. One
+  expensive coat or three cheap ones is a better reward than a sixth threshold
+  crossed on autopilot.
 - **Drag a cat anywhere.** Size runs from 44pt to 320pt; the gaps between cats stay
   click-through, so the overlay never steals a click from the window behind it.
+
+The menu is three tabs: **Agents** for what is running and what it has earned,
+**Cat** for how the cats look and the instrument ladder, **Shop** for the coats.
 
 ### States
 
@@ -100,6 +107,31 @@ The hook itself is a three-line shell script that pipes the payload to a localho
 port with a 250ms timeout and always exits 0 — it can never slow down or break a
 session, only fail to animate a cat.
 
+## Instruments and coats
+
+Instruments are earned by working; coats are bought with what that work banked.
+
+| Instrument | Unlocks at | Coat | Price |
+|---|---|---|---|
+| Bongos | free | Classic | included |
+| 4-Key | 1B | Peach | 500M |
+| 7-Key | 5B | Mint | 1.5B |
+| Arcade | 15B | Sky | 4B |
+| | | Lilac | 10B |
+| | | Gold | 25B |
+
+Thresholds are calibrated against real usage rather than round numbers: a heavy
+multi-workspace week lands around 1B tokens, a month around 5B.
+
+The two ladders do not compete. Instruments cost nothing to unlock, so the whole
+balance stays available for coats — and the full wardrobe at 41B outlasts the last
+instrument by a wide margin, which is what keeps a long-haul goal on the board.
+
+Spending works without a ledger because the lifetime count only grows: the balance
+is that count minus the price of what has been bought, so it recovers on its own and
+a purchase is permanent. *Spent* is derived by summing the coats you own rather than
+kept as a running total, so the two cannot drift apart.
+
 ## Tuning the rhythm
 
 `DrumEngine.tokensPerSecond` (default 120) sets how long a message drums for.
@@ -114,7 +146,7 @@ work: one strike every eight seconds reads as broken.
 ## Development
 
 ```bash
-./scripts/test.sh                                   # 89 tests
+./scripts/test.sh                                   # COUNT tests
 ./scripts/send-test-event.sh Stop demo /tmp/proj    # fake an event
 tail -f ~/.bongotokencat/bongotokencat.log
 ```
@@ -175,10 +207,17 @@ and **[@DitzyFlama](https://twitter.com/ditzyflama)** (the original meme). Per t
 artist is credited and linked — **please keep the credit if you fork this.**
 
 The sprites are derived from [bongocat-osu](https://github.com/kuroni/bongocat-osu)
-(MIT) — its taiko set, which has a filled white body and one image per paw pose.
+(MIT), which has a filled white body and one image per paw pose.
 `scripts/prepare-sprites.py` keys out the opaque white desk behind the cat and the
 white backdrop baked into the bongo photo, so the overlay sits on the desktop with
 nothing behind it. Rerun it against a fresh clone to rebuild the PNGs.
+
+The instruments are its game modes. All four are drawn on one canvas with the same
+cat body and a different thing under its paws, so a mode is already an instrument —
+with paw poses the artist registered against it, at no cost in new artwork. Its two
+osu! modes are missing because they draw the second arm as a curve chasing the
+cursor rather than as a sprite; reproducing that is a bigger job than the instrument
+is worth.
 
 [bongo.cat](https://github.com/Externalizable/bongo.cat) (MIT) was the first source
 tried. Its art is line work with a transparent interior — it only reads as a white
