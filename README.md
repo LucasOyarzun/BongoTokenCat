@@ -31,6 +31,9 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
   crossed on autopilot.
 - **Drag a cat anywhere.** Size runs from 44pt to 320pt; the gaps between cats stay
   click-through, so the overlay never steals a click from the window behind it.
+- **How much quota is left**, per window — session, weekly, and one row per model
+  your plan caps separately. Off until you switch it on; it is the only part of the
+  app that touches the network.
 
 The menu is three tabs: **Agents** for what is running and what it has earned,
 **Cat** for how the cats look and the instrument ladder, **Shop** for the coats.
@@ -132,6 +135,41 @@ is that count minus the price of what has been bought, so it recovers on its own
 a purchase is permanent. *Spent* is derived by summing the coats you own rather than
 kept as a running total, so the two cannot drift apart.
 
+## Usage limits
+
+Under the token counters in the **Agents** tab, one bar per rate-limit window: your
+5-hour session, your week, and a row for each model your plan caps on its own. The
+numbers read as *remaining* by default — flip to *used* in the **Cat** tab, where
+the switch to turn the whole section on and off also lives.
+
+**They are percentages, not tokens, and cannot be anything else.** A quota is not
+denominated in tokens — models weigh differently against it and the divisor is not
+published — so there is no "1.2M tokens left" to show. Claude Code's own `/usage`
+reports percentages for the same reason. The token counters above are *spend*,
+which is a different measurement from a different source; neither converts into the
+other.
+
+Model-specific rows are rendered from whatever the API labels them, not matched
+against a list of model names in our source. A model added next month shows up on
+its own.
+
+### What it sends, and where the credential comes from
+
+This is the one feature that opens a network connection, which is why it ships off.
+Switching it on makes a request every two minutes to
+`api.anthropic.com/api/oauth/usage` — the endpoint Claude Code's own `/usage` is
+built on — authenticated with the OAuth token **already stored on your Mac by
+Claude Code**, read at runtime from `~/.claude/.credentials.json` or your Keychain.
+
+Nothing is bundled: no token ships in the app, so every install reports its own
+account and no credential travels with the binary. Nothing is sent anywhere else —
+there is no server of ours, and no telemetry. The endpoint is undocumented, so a
+failure hides the section rather than raising anything.
+
+macOS will ask once for permission to read the Keychain item. Choosing **Always
+Allow** is a one-time decision because releases are signed with a stable identity —
+see below.
+
 ## Tuning the rhythm
 
 `DrumEngine.tokensPerSecond` (default 120) sets how long a message drums for.
@@ -176,6 +214,29 @@ renamed. The menu shows the full `project · branch`.
 Git is read directly from `.git` rather than by shelling out — Conductor workspaces
 are worktrees, so the `gitdir:` pointer is the normal case here. Results are cached
 for 30s so a burst of hook events costs one lookup.
+
+### Signing
+
+Releases are signed with a self-signed identity created once per machine:
+
+```bash
+./scripts/create-signing-cert.sh
+```
+
+Not cosmetic. macOS ties a Keychain "Always Allow" to the *signature* of the app
+that asked, and an ad-hoc signature is the binary's own hash — a fresh application
+to macOS on every build, so the usage-limits grant would be void after every
+upgrade. A stable certificate makes it a one-time decision:
+
+```
+ad-hoc:  designated => cdhash H"46ecc8…"                     # changes every build
+signed:  designated => identifier "…bongotokencat" and certificate leaf = H"e280c8…"
+```
+
+`build-app.sh` falls back to ad-hoc when the identity is missing, so a clone with no
+certificate still builds. Back the identity up — reissuing it re-prompts every
+existing user. It is not an Apple Developer certificate, so Gatekeeper still
+quarantines the download and the cask still clears it.
 
 ### Releasing
 

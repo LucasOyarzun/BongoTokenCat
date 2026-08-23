@@ -59,7 +59,7 @@ came from them.
 | Project | What we took |
 |---|---|
 | **[LLMPET](https://github.com/myunwang/LLMPET)** by myunwang (MIT) | Driving a desktop pet from Claude Code hooks — that a hook payload is enough to know what an agent is doing, without polling or scraping. |
-| **[PokeTokenBar](https://github.com/chattymin/PokeTokenBar)** by chattymin (MIT) | Reading token usage from Claude Code's local transcripts, and spending it as a progression currency. Its Homebrew tap + cask release setup is also the model for ours. |
+| **[PokeTokenBar](https://github.com/chattymin/PokeTokenBar)** by chattymin (MIT) | Reading token usage from Claude Code's local transcripts, and spending it as a progression currency. Its Homebrew tap + cask release setup is also the model for ours. Two harder-won findings as well: that `api.anthropic.com/api/oauth/usage` is where per-window quota comes from and which credential authenticates it, and that a stable self-signed identity — not an ad-hoc signature — is what keeps a Keychain grant alive across upgrades. |
 
 ## Runtime dependencies
 
