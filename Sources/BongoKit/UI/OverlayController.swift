@@ -57,11 +57,11 @@ final class OverlayController {
         syncClock()
     }
 
-    /// A dragged position wins over the anchor, clamped so a resize cannot push the
-    /// overlay off screen and out of reach.
+    /// A dragged position wins over the default corner, clamped so a resize cannot
+    /// push the overlay off screen and out of reach.
     private func panelOrigin(for size: CGSize) -> CGPoint {
         guard let dragged = settings.overlayOrigin else {
-            return OverlayLayout.origin(for: size, in: screenFrame, anchor: settings.anchor)
+            return OverlayLayout.defaultOrigin(for: size, in: screenFrame)
         }
         return OverlayLayout.clamp(origin: dragged, size: size, to: screenFrame)
     }
@@ -141,7 +141,7 @@ final class OverlayController {
     /// drum deadlines are deliberately absent: those flow through observation.
     private func layoutSignature(columns: Int) -> String {
         let ids = registry.visibleAgents.map(\.id).joined(separator: ",")
-        return "\(settings.catMode.rawValue)|\(settings.skinID)|\(settings.catWidth)|\(settings.showsWorkspaceLabels)|\(columns)|\(ids)"
+        return "\(settings.catMode.rawValue)|\(settings.instrumentID)|\(settings.coatID)|\(settings.catWidth)|\(settings.showsWorkspaceLabels)|\(columns)|\(ids)"
     }
 
     private func currentGrid() -> OverlayLayout.Grid {

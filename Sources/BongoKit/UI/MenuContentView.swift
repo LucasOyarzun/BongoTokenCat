@@ -1,217 +1,82 @@
 import SwiftUI
 
-/// The menu bar popover: setup, usage, skins, and what every agent is doing.
+/// The three faces of the popover.
+enum MenuTab: String, CaseIterable, Identifiable {
+    case agents, cat, shop
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .agents: return "Agents"
+        case .cat:    return "Cat"
+        case .shop:   return "Shop"
+        }
+    }
+}
+
+/// The menu bar popover: a tab bar over what is running, how the cat looks, and
+/// what there is to buy — with a footer that stays put whichever tab is open.
+///
+/// Tabs are a segmented control rather than a `TabView`: inside an `NSPopover` a
+/// `TabView` brings its own chrome and its own ideas about sizing, both of which
+/// fight a fixed-width panel. A segmented control is the macOS idiom here anyway.
 struct MenuContentView: View {
-    @Bindable var model: AppModel
+    let model: AppModel
     @Bindable var settings: Settings
     let registry: AgentRegistry
     let onSettingsChanged: () -> Void
     let onResetPosition: () -> Void
     let onQuit: () -> Void
 
+    @State private var tab: MenuTab = .agents
+
+    /// Shared with the popover hosting this view, so the two cannot disagree about
+    /// how much room the content needs.
+    static let preferredSize = CGSize(width: 320, height: 550)
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if !model.hooksInstalled { setupCard }
-                usageSection
-                Divider()
-                agentsSection
-                Divider()
-                appearanceSection
-                Divider()
-                skinsSection
-                footer
+        VStack(spacing: 0) {
+            Picker("Section", selection: $tab) {
+                ForEach(MenuTab.allCases) { Text($0.label).tag($0) }
             }
-            .padding(14)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            // One fixed height rather than one per tab: AppKit sizes the popover
+            // once, so letting each tab decide would leave the shortest with a pane
+            // of dead space and clip the tallest.
+            ScrollView {
+                selectedTab.padding(14)
+            }
+
+            Divider()
+
+            footer
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
         }
-        .frame(width: 320)
+        .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
     }
 
-    // MARK: - Setup
-
-    private var setupCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Hooks not installed", systemImage: "bolt.horizontal.circle")
-                .font(.headline)
-            Text("BongoTokenCat needs to register hooks in ~/.claude/settings.json to see what your agents are doing. Your existing hooks are kept — a backup is written first.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Button("Install hooks") { model.installHooks() }
-                .buttonStyle(.borderedProminent)
-            if let error = model.lastInstallError {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-        }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.12)))
-    }
-
-    // MARK: - Usage
-
-    private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Tokens").font(.headline)
-                Spacer()
-                if model.isScanning { ProgressView().controlSize(.small) }
-            }
-            HStack {
-                stat("Today", TokenFormatter.compact(model.totals.today))
-                Spacer()
-                stat("All time", TokenFormatter.compact(model.totals.lifetime))
-            }
-            if let next = model.nextSkin {
-                VStack(alignment: .leading, spacing: 3) {
-                    ProgressView(value: model.progressTowardNextSkin())
-                    Text("Next: \(next.name) at \(TokenFormatter.compact(next.tokensRequired))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
+    @ViewBuilder
+    private var selectedTab: some View {
+        switch tab {
+        case .agents:
+            MenuAgentsTab(model: model, registry: registry)
+        case .cat:
+            MenuCatTab(model: model,
+                       settings: settings,
+                       onSettingsChanged: onSettingsChanged,
+                       onResetPosition: onResetPosition)
+        case .shop:
+            MenuShopTab(model: model, settings: settings, onSettingsChanged: onSettingsChanged)
         }
     }
-
-    private func stat(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.system(.title3, design: .rounded).weight(.semibold))
-        }
-    }
-
-    // MARK: - Agents
-
-    private var agentsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Agents").font(.headline)
-            let agents = registry.visibleAgents
-            if agents.isEmpty {
-                Text("Nothing running. Start a Claude Code session and a cat appears.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(agents) { agent in
-                    HStack(spacing: 8) {
-                        Circle().fill(color(for: agent.state)).frame(width: 8, height: 8)
-                        Text(agent.fullLabel).font(.callout).lineLimit(1).truncationMode(.head)
-                        Spacer()
-                        Text(description(of: agent))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-        }
-    }
-
-    private func description(of agent: Agent) -> String {
-        switch agent.state {
-        case .working:    return agent.toolName.map { "working · \($0)" } ?? "working"
-        case .delegating: return "subagents"
-        case .thinking:   return "thinking"
-        case .needsInput: return "waiting for you"
-        case .failed:     return "error"
-        case .done:       return "done"
-        case .idle:       return "idle"
-        case .sleeping:   return "asleep"
-        }
-    }
-
-    private func color(for state: AgentState) -> Color {
-        switch state {
-        case .working, .delegating: return .green
-        case .thinking:             return .blue
-        case .needsInput:           return .orange
-        case .failed:               return .red
-        case .done:                 return .teal
-        case .idle:                 return .gray
-        case .sleeping:             return .gray.opacity(0.4)
-        }
-    }
-
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Cats").font(.headline)
-
-            Picker("Show", selection: $settings.catMode) {
-                ForEach(CatMode.allCases, id: \.self) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.radioGroup)
-            .onChange(of: settings.catMode) { _, _ in onSettingsChanged() }
-
-            Toggle("Show on desktop", isOn: $settings.showsOverlay)
-                .onChange(of: settings.showsOverlay) { _, _ in onSettingsChanged() }
-
-            Toggle("Label with workspace", isOn: $settings.showsWorkspaceLabels)
-                .onChange(of: settings.showsWorkspaceLabels) { _, _ in onSettingsChanged() }
-
-            Picker("Corner", selection: $settings.anchor) {
-                ForEach(OverlayAnchor.allCases, id: \.self) { Text($0.label).tag($0) }
-            }
-            .onChange(of: settings.anchor) { _, _ in onSettingsChanged() }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Size").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(Int(settings.catWidth)) pt").font(.caption2).foregroundStyle(.secondary)
-                }
-                Slider(value: $settings.catWidth,
-                       in: Settings.minimumCatWidth...Settings.maximumCatWidth)
-                    .onChange(of: settings.catWidth) { _, _ in onSettingsChanged() }
-            }
-
-            HStack {
-                Text("Drag a cat to move it anywhere.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Reset", action: onResetPosition)
-                    .buttonStyle(.link)
-                    .font(.caption2)
-            }
-        }
-    }
-
-    // MARK: - Skins
-
-    private var skinsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Skins").font(.headline)
-            ForEach(SkinCatalog.all) { skin in
-                skinRow(skin)
-            }
-        }
-    }
-
-    private func skinRow(_ skin: Skin) -> some View {
-        let unlocked = model.isUnlocked(skin)
-        let selected = settings.skinID == skin.id
-        return Button {
-            guard unlocked else { return }
-            settings.skinID = skin.id
-            onSettingsChanged()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: unlocked ? (selected ? "largecircle.fill.circle" : "circle") : "lock.fill")
-                    .foregroundStyle(unlocked ? Color.accentColor : .secondary)
-                Text(skin.name)
-                Spacer()
-                if !unlocked {
-                    Text(TokenFormatter.compact(skin.tokensRequired))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!unlocked)
-    }
-
-    // MARK: - Footer
 
     private var footer: some View {
         HStack {

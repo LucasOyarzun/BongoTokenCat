@@ -69,22 +69,14 @@ enum OverlayLayout {
     }
 
     /// Bottom-left origin for the panel, in screen coordinates.
-    static func origin(for size: CGSize, in frame: CGRect, anchor: OverlayAnchor) -> CGPoint {
+    ///
+    /// A corner is where the cats *start*, not where they live: dragging one moves
+    /// the whole row and the position sticks. That left the corner picker choosing
+    /// between four positions all of which a single drag overrides, so the bottom
+    /// right — furthest from the menu bar and from most window chrome — is simply
+    /// the default now.
+    static func defaultOrigin(for size: CGSize, in frame: CGRect) -> CGPoint {
         let inset: Double = 16
-        let x: Double
-        let y: Double
-        switch anchor {
-        case .bottomLeading, .topLeading:
-            x = frame.minX + inset
-        case .bottomTrailing, .topTrailing:
-            x = frame.maxX - size.width - inset
-        }
-        switch anchor {
-        case .bottomLeading, .bottomTrailing:
-            y = frame.minY + inset
-        case .topLeading, .topTrailing:
-            y = frame.maxY - size.height - inset
-        }
-        return CGPoint(x: x, y: y)
+        return CGPoint(x: frame.maxX - size.width - inset, y: frame.minY + inset)
     }
 }
