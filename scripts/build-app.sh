@@ -7,7 +7,7 @@ APP_NAME="BongoTokenCat"
 # Kept separate from APP_NAME even though they match today: one names the product,
 # the other has to track Package.swift's `name:` for the resource bundle lookup.
 PACKAGE_NAME="BongoTokenCat"
-VERSION="0.1.0"
+VERSION="0.2.0"
 # Conductor workspaces live on a filesystem where SwiftPM's SQLite build database
 # fails with a disk I/O error, so the scratch directory is kept outside the repo.
 SCRATCH="${SCRATCH_PATH:-/tmp/bongo-build}"
