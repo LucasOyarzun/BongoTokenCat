@@ -51,5 +51,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$APP" 2>/dev/null || echo "   (unsigned — fine for local use)"
+# A stable identity is what keeps the Keychain "Always Allow" for the usage limits
+# section alive across upgrades — see scripts/create-signing-cert.sh. Ad-hoc is the
+# fallback so a clone with no certificate (CI, a contributor) still builds; it just
+# re-prompts on every install.
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-BongoTokenCat Local}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -F "\"$SIGN_IDENTITY\"" >/dev/null; then
+    echo "==> codesign as $SIGN_IDENTITY"
+    codesign --force --deep --sign "$SIGN_IDENTITY" "$APP"
+else
+    echo "==> codesign ad-hoc ('$SIGN_IDENTITY' not found — run scripts/create-signing-cert.sh)"
+    codesign --force --deep --sign - "$APP" 2>/dev/null || echo "   (unsigned — fine for local use)"
+fi
 echo "==> built $APP"
