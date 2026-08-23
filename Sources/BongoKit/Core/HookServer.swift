@@ -54,22 +54,11 @@ final class HookServer {
         self.handler = ConnectionHandler(token: token, onEvent: onEvent)
     }
 
-    func start() throws {
-        for port in HookTransport.ports {
-            let listener: NWListener
-            do {
-                listener = try makeListener(on: port)
-            } catch {
-                AppLog.write("port \(port) unavailable: \(error)")
-                continue
-            }
-            self.listener = listener
-            listener.start(queue: .global(qos: .userInitiated))
-            try HookTransport.publish(.init(port: port, token: token))
-            AppLog.write("hook server listening on 127.0.0.1:\(port)")
-            return
-        }
-        throw HookServerError.noPortAvailable
+    func start() async throws {
+        guard let bound = await bindFirstFreePort() else { throw HookServerError.noPortAvailable }
+        listener = bound.listener
+        try HookTransport.publish(.init(port: bound.port, token: token))
+        AppLog.write("hook server listening on 127.0.0.1:\(bound.port)")
     }
 
     func stop() {
@@ -78,9 +67,30 @@ final class HookServer {
         HookTransport.clearRuntime()
     }
 
-    /// Binds to loopback only. The port comes from `requiredLocalEndpoint` rather
-    /// than `NWListener(using:on:)` — passing both makes the listener fail to bind.
-    private func makeListener(on port: UInt16) throws -> NWListener {
+    /// Kept separate from `start`, and taking its range as an argument, so the
+    /// fallback can be tested without publishing a runtime file over the one a
+    /// running app owns or depending on which ports this machine has free.
+    func bindFirstFreePort(in ports: [UInt16] = HookTransport.ports) async -> (listener: NWListener, port: UInt16)? {
+        for port in ports {
+            do {
+                return (try await bind(to: port), port)
+            } catch {
+                AppLog.write("port \(port) unavailable: \(error)")
+            }
+        }
+        return nil
+    }
+
+    /// Binds to loopback only, and resolves only once the bind has actually landed.
+    ///
+    /// `NWListener.start` returns immediately whatever happens — a port conflict
+    /// arrives at the state handler a moment later. Waiting for `.ready` here is
+    /// what makes the caller's fallback loop real: without it every port after the
+    /// first was unreachable code, and the app published a port it never held.
+    ///
+    /// The port comes from `requiredLocalEndpoint` rather than
+    /// `NWListener(using:on:)` — passing both makes the listener fail to bind.
+    private func bind(to port: UInt16) async throws -> NWListener {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw HookServerError.noPortAvailable }
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: nwPort)
@@ -88,13 +98,44 @@ final class HookServer {
         let listener = try NWListener(using: parameters)
         let handler = self.handler
         listener.newConnectionHandler = { connection in handler.serve(connection) }
-        // Binding happens asynchronously after start(), so a port conflict surfaces
-        // here rather than as a thrown error. Without this the app would look fine
-        // while silently receiving nothing.
-        listener.stateUpdateHandler = { state in
-            if case .failed(let error) = state { AppLog.write("listener on \(port) failed: \(error)") }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            // Every branch swaps the handler out *before* resuming. NWListener keeps
+            // reporting after the state we act on — .cancelled follows the .cancel()
+            // below — and resuming a continuation twice traps.
+            let settle: @Sendable (Result<NWListener, Error>) -> Void = { result in
+                listener.stateUpdateHandler = Self.logLateFailures(on: port)
+                continuation.resume(with: result)
+            }
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    settle(.success(listener))
+                // A port already in use surfaces as .failed on some releases and as
+                // .waiting on others. Both mean this port is not ours; treating
+                // .waiting as recoverable would hang here until the holder quit.
+                case .failed(let error), .waiting(let error):
+                    settle(.failure(error))
+                    listener.cancel()
+                default:
+                    break   // .setup
+                }
+            }
+            listener.start(queue: .global(qos: .userInitiated))
         }
-        return listener
+    }
+
+    /// A listener can still fail after a clean bind — the interface goes away, the
+    /// socket is torn down. Nothing to recover from at that point, but a silent
+    /// overlay should not be the only evidence.
+    /// `nonisolated` because the listener calls this back on its own queue, not the
+    /// main actor the rest of the class lives on.
+    private nonisolated static func logLateFailures(on port: UInt16) -> @Sendable (NWListener.State) -> Void {
+        { state in
+            if case .failed(let error) = state {
+                AppLog.write("listener on \(port) failed after binding: \(error)")
+            }
+        }
     }
 }
 

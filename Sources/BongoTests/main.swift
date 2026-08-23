@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-func runAllTests() -> Never {
+func runAllTests() async -> Never {
     runEventMappingTests()
     runStateDecayTests()
     runGitContextTests()
@@ -14,7 +14,8 @@ func runAllTests() -> Never {
     runTokenReaderPerformanceTests()
     runUsageCacheTests()
     runOverlayInteractionTests()
+    await runHookServerTests()
     reportAndExit()
 }
 
-MainActor.assumeIsolated { runAllTests() }
+await runAllTests()

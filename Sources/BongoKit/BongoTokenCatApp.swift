@@ -60,12 +60,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // actor because the overlay reads it directly.
             Task { @MainActor in self?.receive(event) }
         }
-        do {
-            try server.start()
-            self.server = server
-        } catch {
-            AppLog.write("hook server failed to start: \(error)")
-            model.lastInstallError = "Could not open a local port for the hook listener."
+        // Binding is asynchronous, so launch no longer waits on it. A hook that
+        // fires in the gap finds no runtime.json and exits 0, which is the same
+        // path it already takes when the app is not running.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await server.start()
+                self.server = server
+            } catch {
+                AppLog.write("hook server failed to start: \(error)")
+                self.model.lastInstallError = "Could not open a local port for the hook listener."
+            }
         }
     }
 
