@@ -4,15 +4,75 @@ import SwiftUI
 struct MenuAgentsTab: View {
     let model: AppModel
     let registry: AgentRegistry
+    /// Installing an update means getting out of brew's way, and quitting is the
+    /// app's own business rather than a tab's — so it arrives the same way the
+    /// footer's Quit does.
+    let onQuit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            updateCard
             if !model.hooksInstalled { setupCard }
             usageSection
             limitsSection
             Divider()
             agentsSection
         }
+    }
+
+    // MARK: - Update
+
+    /// Only ever on screen when there is something to do about it. An app that is
+    /// already current says so in the Cat tab, next to the switch — not here, where
+    /// it would be a permanent line reporting that nothing has happened.
+    @ViewBuilder
+    private var updateCard: some View {
+        switch model.updateState {
+        case .available(let release):
+            availableCard(release)
+        case .installing:
+            Label("Updating. The app will quit and reopen on its own.", systemImage: "arrow.down.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .failed(let reason):
+            Text(reason).font(.caption).foregroundStyle(.red)
+        case .unknown, .upToDate:
+            EmptyView()
+        }
+    }
+
+    private func availableCard(_ release: Release) -> some View {
+        // Built here rather than interpolated into the Label: a `LocalizedStringKey`
+        // interpolating an arbitrary type falls back to its debug description, and
+        // the compiler deprecates it for exactly that reason.
+        let headline = "Version \(release.version) is out"
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(headline, systemImage: "sparkles")
+                .font(.headline)
+            if model.canInstallUpdate {
+                Text("Homebrew installed this copy, so it can be replaced from here. The app quits, upgrades and reopens.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Button("Update and restart") {
+                        guard model.startUpdateInstall() else { return }
+                        onQuit()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Link("What changed", destination: release.url).font(.caption)
+                }
+            } else {
+                // Built from source, or moved out from under the cask. Offering a
+                // button that ran `brew upgrade` here would replace a different app
+                // than the one being looked at, so it says what it can and stops.
+                Text("This copy did not come from Homebrew, so it cannot be replaced from here. Pull and rebuild, or read what changed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Link("Release notes", destination: release.url).font(.caption)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.12)))
     }
 
     // MARK: - Setup
@@ -111,7 +171,7 @@ struct MenuAgentsTab: View {
 
     private var enableLimitsCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("See how much of your session and weekly quota is left. This asks Anthropic for your own account's limits — the only thing in this app that uses the network.")
+            Text("See how much of your session and weekly quota is left. This asks Anthropic for your own account's limits, using the credential Claude Code already stores on this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("Show limits") { model.setUsageLimits(enabled: true) }

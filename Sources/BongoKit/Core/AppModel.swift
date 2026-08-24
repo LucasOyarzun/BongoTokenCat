@@ -16,6 +16,20 @@ enum LimitsState: Sendable, Equatable {
     case unavailable(String)
 }
 
+/// What the update row is able to say right now.
+///
+/// A failed check collapses back into `.unknown` rather than getting a case of its
+/// own: not knowing whether there is a new version and failing to find out are the
+/// same thing to a user, and neither is worth a line on screen.
+enum UpdateState: Sendable, Equatable {
+    case unknown
+    case upToDate
+    case available(Release)
+    /// The upgrade is running and this process is about to be replaced under itself.
+    case installing
+    case failed(String)
+}
+
 /// Everything the menu bar needs that is not per-agent state: the token scan, the
 /// hook install, the wallet the shop spends from, and the quota bars.
 @MainActor
@@ -29,10 +43,15 @@ final class AppModel {
     private(set) var limitsState: LimitsState = .off
     var isRefreshingLimits = false
 
+    private(set) var updateState: UpdateState = .unknown
+    var isCheckingForUpdate = false
+
     /// Held so the wallet can answer in one place instead of every shop row doing
     /// its own arithmetic over totals and purchases.
     private let settings: Settings
     private let limitsProvider: LimitsProviding
+    private let updateChecker: UpdateChecking
+    private let installMethod = HomebrewInstall.detect(bundlePath: Bundle.main.bundlePath)
 
     /// Kept in memory only. It is never written anywhere, never logged, and dies
     /// with the process — the Keychain and Claude Code's own file remain the only
@@ -46,9 +65,12 @@ final class AppModel {
     /// one in the Keychain.
     private var fileCredentialRejected = false
 
-    init(settings: Settings, limitsProvider: LimitsProviding = AnthropicLimitsProvider()) {
+    init(settings: Settings,
+         limitsProvider: LimitsProviding = AnthropicLimitsProvider(),
+         updateChecker: UpdateChecking = GitHubUpdateChecker()) {
         self.settings = settings
         self.limitsProvider = limitsProvider
+        self.updateChecker = updateChecker
         limitsState = settings.showsUsageLimits ? .waiting : .off
     }
 
@@ -200,6 +222,79 @@ final class AppModel {
     }
 
     private static let defaultBackoff: TimeInterval = 5 * 60
+
+    // MARK: - Updates
+
+    var checksForUpdates: Bool { settings.checksForUpdates }
+
+    /// True when the upgrade can be a button rather than a link to the release page.
+    var canInstallUpdate: Bool {
+        if case .homebrew = installMethod { return true }
+        return false
+    }
+
+    /// The only place the running version is stated at all, which is why it reads as
+    /// a sentence rather than a bare number.
+    var updateStatusText: String {
+        let running = Version.current.map { "You are on \($0)." } ?? "Version unknown."
+        switch updateState {
+        case .available(let release): return "\(running) \(release.version) is available."
+        case .upToDate:               return "\(running) Up to date."
+        case .installing:             return "Updating…"
+        case .failed(let reason):     return reason
+        case .unknown:                return running
+        }
+    }
+
+    func setChecksForUpdates(enabled: Bool) {
+        settings.checksForUpdates = enabled
+        guard enabled else {
+            updateState = .unknown
+            return
+        }
+        Task { await checkForUpdate() }
+    }
+
+    /// Failures are swallowed on the same grounds as the limits section: this is a
+    /// courtesy on top of an app whose job is drumming cats, and a version number it
+    /// could not fetch is not worth a word on screen.
+    func checkForUpdate() async {
+        guard settings.checksForUpdates, !isCheckingForUpdate else { return }
+        guard let current = Version.current else { return }
+
+        isCheckingForUpdate = true
+        defer { isCheckingForUpdate = false }
+
+        do {
+            let release = try await updateChecker.latestRelease()
+            // The switch can be flipped while this call is in flight. The guard at the
+            // top of the function ran before the await, so it says nothing about now —
+            // and without this, turning checks off would still be followed by a card.
+            guard settings.checksForUpdates else { return }
+            updateState = release.version > current ? .available(release) : .upToDate
+            AppLog.write("update check: running \(current), latest \(release.version)")
+        } catch {
+            AppLog.write("update check failed: \(error)")
+        }
+    }
+
+    /// Starts the upgrade and reports whether the caller should now quit. The script
+    /// it spawned is already waiting for this process to exit before it replaces the
+    /// bundle, so a `true` here is an instruction, not a status.
+    func startUpdateInstall() -> Bool {
+        guard case .homebrew(let brewPath) = installMethod,
+              case .available = updateState else { return false }
+        do {
+            try UpdateInstaller.startUpgrade(brewPath: brewPath, bundlePath: Bundle.main.bundlePath)
+            updateState = .installing
+            AppLog.write("update: upgrade started, quitting so brew can replace the bundle")
+            return true
+        } catch {
+            updateState = .failed("Could not start the upgrade. \(error.localizedDescription)")
+            AppLog.write("update install failed: \(error)")
+            return false
+        }
+    }
 
     // MARK: - Hooks
 

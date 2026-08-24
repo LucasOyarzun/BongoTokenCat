@@ -67,7 +67,7 @@ struct MenuContentView: View {
     private var selectedTab: some View {
         switch tab {
         case .agents:
-            MenuAgentsTab(model: model, registry: registry)
+            MenuAgentsTab(model: model, registry: registry, onQuit: onQuit)
         case .cat:
             MenuCatTab(model: model,
                        settings: settings,

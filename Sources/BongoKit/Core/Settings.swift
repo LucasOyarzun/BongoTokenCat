@@ -54,6 +54,14 @@ final class Settings {
         didSet { defaults.set(limitsShowRemaining, forKey: Keys.limitsShowRemaining) }
     }
 
+    /// On by default, unlike the limits section. Both open a network connection, but
+    /// this one is anonymous, carries no credential, and asks a public API for a
+    /// number that is already public — and an app that quietly goes stale is a worse
+    /// default than one that mentions a release exists.
+    var checksForUpdates: Bool {
+        didSet { defaults.set(checksForUpdates, forKey: Keys.checksForUpdates) }
+    }
+
     /// Coats bought from the shop. Only ever added to — a coat you paid for stays
     /// yours, and the balance it cost comes back as the lifetime count grows.
     private(set) var purchasedCoatIDs: Set<String> {
@@ -74,6 +82,7 @@ final class Settings {
         static let showsWorkspaceLabels = "showsWorkspaceLabels"
         static let showsUsageLimits = "showsUsageLimits"
         static let limitsShowRemaining = "limitsShowRemaining"
+        static let checksForUpdates = "checksForUpdates"
         static let hasCustomPosition = "hasCustomPosition"
         static let originX = "overlayOriginX"
         static let originY = "overlayOriginY"
@@ -95,6 +104,7 @@ final class Settings {
         showsWorkspaceLabels = defaults.object(forKey: Keys.showsWorkspaceLabels) as? Bool ?? true
         showsUsageLimits = defaults.object(forKey: Keys.showsUsageLimits) as? Bool ?? false
         limitsShowRemaining = defaults.object(forKey: Keys.limitsShowRemaining) as? Bool ?? true
+        checksForUpdates = defaults.object(forKey: Keys.checksForUpdates) as? Bool ?? true
         if defaults.bool(forKey: Keys.hasCustomPosition) {
             overlayOrigin = CGPoint(x: defaults.double(forKey: Keys.originX),
                                     y: defaults.double(forKey: Keys.originY))

@@ -32,8 +32,10 @@ macOS menu bar app. Swift 6 + SwiftUI, no dependencies.
 - **Drag a cat anywhere.** Size runs from 44pt to 320pt; the gaps between cats stay
   click-through, so the overlay never steals a click from the window behind it.
 - **How much quota is left**, per window — session, weekly, and one row per model
-  your plan caps separately. Off until you switch it on; it is the only part of the
-  app that touches the network.
+  your plan caps separately. Off until you switch it on; it is the only thing here
+  that sends a credential anywhere.
+- **Tells you when there is a new version**, and upgrades itself if Homebrew
+  installed it — the app quits, runs `brew upgrade`, and reopens.
 
 The menu is three tabs: **Agents** for what is running and what it has earned,
 **Cat** for how the cats look and the instrument ladder, **Shop** for the coats.
@@ -75,7 +77,8 @@ open -a BongoTokenCat
 
 Then open the menu bar icon and press **Install hooks**.
 
-Updating is `brew upgrade --cask bongo-token-cat`. Uninstalling is
+Updating is `brew upgrade --cask bongo-token-cat`, or the **Update and restart**
+button the app shows when a release lands — see [Updates](#updates). Uninstalling is
 `brew uninstall --zap --cask bongo-token-cat` — but press **Remove hooks** in the
 menu first, because Homebrew will not touch your `~/.claude/settings.json`.
 
@@ -155,7 +158,8 @@ its own.
 
 ### What it sends, and where the credential comes from
 
-This is the one feature that opens a network connection, which is why it ships off.
+This is the only feature that sends a credential anywhere, which is why it ships
+off. (The [update check](#updates) also uses the network, but anonymously.)
 Switching it on makes a request every two minutes to
 `api.anthropic.com/api/oauth/usage` — the endpoint Claude Code's own `/usage` is
 built on — authenticated with the OAuth token **already stored on your Mac by
@@ -169,6 +173,40 @@ failure hides the section rather than raising anything.
 macOS will ask once for permission to read the Keychain item. Choosing **Always
 Allow** is a one-time decision because releases are signed with a stable identity —
 see below.
+
+## Updates
+
+Once a day and once at launch, the app asks GitHub for the latest release and
+compares it against its own `CFBundleShortVersionString`. If there is a newer one, a
+card appears at the top of the **Agents** tab. The switch is in the **Cat** tab,
+alongside the version you are running and a **Check now** button.
+
+Unauthenticated, and deliberately so: the endpoint needs no token, and storing a
+credential to learn a version number that is already public would be a worse trade
+than the sixty-requests-an-hour ceiling it buys. Nothing about you is sent. Unlike
+the limits section this ships **on**, because an app that quietly goes stale is a
+worse default than one that mentions a release exists.
+
+### Updating in place
+
+If Homebrew installed the app, the card offers **Update and restart** and the whole
+thing is one click: the app quits, `brew update && brew upgrade --cask` runs, and the
+app reopens at the new version.
+
+The upgrade cannot run as a child of the app. The cask carries
+`uninstall quit: "io.github.lucasoyarzun.bongotokencat"`, so killing BongoTokenCat is
+the *first* thing `brew upgrade` does — a child process would be terminated partway
+through replacing its own bundle. Instead the app writes `~/.bongotokencat/update.sh`,
+spawns it detached, and quits on purpose; the script waits for the process to actually
+exit (up to ten seconds, then proceeds anyway), upgrades, and reopens the app. Its
+output lands in `~/.bongotokencat/update.log`, which is the only account of what
+happened given the app was not running to watch it.
+
+A copy built from source gets the notice but no button. Homebrew tracks installs in
+its own Caskroom rather than by reading `Info.plist`, so the app checks that the
+Caskroom symlink resolves to *this* bundle before offering to replace it — otherwise
+`brew upgrade` would replace a different copy than the one on screen and the notice
+would never go away.
 
 ## Tuning the rhythm
 

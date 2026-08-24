@@ -13,6 +13,8 @@ struct MenuCatTab: View {
             Divider()
             limitsSection
             Divider()
+            updatesSection
+            Divider()
             instrumentsSection
         }
     }
@@ -83,6 +85,39 @@ struct MenuCatTab: View {
             .disabled(!model.showsUsageLimits)
 
             Text("Asks Anthropic for your account's own quota, using the credential Claude Code already stores on this Mac.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Updates
+
+    /// The notice appears in the Agents tab when there is one; this is where it gets
+    /// switched off, and the only place the running version is shown.
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Updates").font(.headline)
+
+            Toggle("Check for new versions", isOn: Binding(
+                get: { model.checksForUpdates },
+                set: { model.setChecksForUpdates(enabled: $0) }))
+
+            HStack(spacing: 8) {
+                Text(model.updateStatusText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                if model.isCheckingForUpdate {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button("Check now") { Task { await model.checkForUpdate() } }
+                        .buttonStyle(.link)
+                        .font(.caption2)
+                        .disabled(!model.checksForUpdates)
+                }
+            }
+
+            Text("Asks GitHub for the latest release. Anonymous, and it sends nothing about you.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var decayTimer: Timer?
     private var usageTimer: Timer?
     private var limitsTimer: Timer?
+    private var updateTimer: Timer?
 
     /// State only ages, so it has to be re-evaluated on a clock rather than on
     /// events — an abandoned session emits nothing by definition.
@@ -43,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// scan — but it is one HTTP call to someone else's undocumented endpoint, so not
     /// much tighter. Two minutes keeps the bars honest without leaning on it.
     private static let limitsInterval: TimeInterval = 2 * 60
+    /// Once a day. A menu bar app runs for weeks between reboots, so checking only
+    /// at launch would mean never on the machines that never restart — and releases
+    /// land a few times a year, so anything tighter polls for a number that has not
+    /// moved. Deliberately not wired to the popover as the limits are: opening the
+    /// menu is a glance, and glances would spend the whole unauthenticated budget.
+    private static let updateInterval: TimeInterval = 24 * 60 * 60
     private static let escapeKeyCode: UInt16 = 53
 
     /// Built here rather than from property defaults because the model spends from
@@ -61,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startTimers()
         Task { await model.refreshTotals() }
         Task { await model.refreshLimits(userInitiated: false) }
+        Task { await model.checkForUpdate() }
         overlay.sync()
         AppLog.write("BongoTokenCat started")
     }
@@ -116,6 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         limitsTimer = Timer.scheduledTimer(withTimeInterval: Self.limitsInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.model.refreshLimits(userInitiated: false) }
+        }
+        updateTimer = Timer.scheduledTimer(withTimeInterval: Self.updateInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.model.checkForUpdate() }
         }
     }
 
