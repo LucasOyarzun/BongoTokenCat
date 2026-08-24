@@ -267,6 +267,10 @@ final class AppModel {
 
         do {
             let release = try await updateChecker.latestRelease()
+            // The switch can be flipped while this call is in flight. The guard at the
+            // top of the function ran before the await, so it says nothing about now —
+            // and without this, turning checks off would still be followed by a card.
+            guard settings.checksForUpdates else { return }
             updateState = release.version > current ? .available(release) : .upToDate
             AppLog.write("update check: running \(current), latest \(release.version)")
         } catch {
