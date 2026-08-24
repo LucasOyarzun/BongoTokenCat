@@ -26,10 +26,31 @@ is_valid_identity() {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# Idempotent by design, and the exit is the point rather than a shortcut: reissuing
-# would produce a different identity and undo exactly what the certificate is for.
+# Lets codesign reach the private key without a dialog on every build.
+#
+# Importing with -T names codesign as allowed, but on modern macOS the key also
+# carries a partition list that the ACL is checked against, and an imported key
+# starts with an empty one. Until this runs, codesign fails with the singularly
+# unhelpful `errSecInternalComponent` — or worse, blocks on a dialog that never
+# appears when the build runs anywhere but a logged-in Terminal.
+#
+# It asks for the login password because macOS will not hand out key access on a
+# script's say-so. That is the one interactive moment in this setup.
+authorise_codesign() {
+    echo "==> authorising codesign to use the key"
+    echo "    macOS will ask for your login password."
+    security set-key-partition-list -S apple-tool:,apple:,codesign: \
+        -s -l "$IDENTITY" "$KEYCHAIN" >/dev/null
+}
+
+# Idempotent by design, and the early exit is the point rather than a shortcut:
+# reissuing would produce a different identity and undo exactly what the certificate
+# is for. The authorisation still runs — it is the step most likely to be missing on
+# a machine where the certificate is already there.
 if is_valid_identity; then
-    echo "'$IDENTITY' already exists and is valid — leaving it alone."
+    echo "'$IDENTITY' already exists — keeping it."
+    authorise_codesign
+    echo "ready."
     exit 0
 fi
 
@@ -75,6 +96,8 @@ echo "==> importing into the login keychain"
 security import "$WORK/identity.p12" -k "$KEYCHAIN" -P "$TRANSFER_PASSWORD" -T /usr/bin/codesign
 security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$WORK/cert.pem" 2>/dev/null || true
 
+authorise_codesign
+
 if is_valid_identity; then
     echo "'$IDENTITY' is ready."
 else
@@ -86,7 +109,6 @@ cat <<DONE
 
 next:
   ./scripts/build-app.sh now signs with this identity.
-  The first build may ask once whether codesign may use the key — say Always Allow.
 
 back it up, because reissuing it re-prompts every existing user:
   security export -k "$KEYCHAIN" -t identities -f pkcs12 -o bongo-signing-identity.p12

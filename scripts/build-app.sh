@@ -58,7 +58,14 @@ PLIST
 SIGN_IDENTITY="${CODESIGN_IDENTITY:-BongoTokenCat Local}"
 if security find-identity -v -p codesigning 2>/dev/null | grep -F "\"$SIGN_IDENTITY\"" >/dev/null; then
     echo "==> codesign as $SIGN_IDENTITY"
-    codesign --force --deep --sign "$SIGN_IDENTITY" "$APP"
+    # Never silently falls back to ad-hoc: an ad-hoc release would void the Keychain
+    # grant of every existing install, and doing that quietly is worse than stopping.
+    if ! codesign --force --deep --sign "$SIGN_IDENTITY" "$APP"; then
+        echo "✗ could not sign with '$SIGN_IDENTITY'." >&2
+        echo "  errSecInternalComponent here means codesign cannot reach the private key." >&2
+        echo "  Run ./scripts/create-signing-cert.sh — it authorises the key and is safe to rerun." >&2
+        exit 1
+    fi
 else
     echo "==> codesign ad-hoc ('$SIGN_IDENTITY' not found — run scripts/create-signing-cert.sh)"
     codesign --force --deep --sign - "$APP" 2>/dev/null || echo "   (unsigned — fine for local use)"

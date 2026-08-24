@@ -233,8 +233,14 @@ ad-hoc:  designated => cdhash H"46ecc8…"                     # changes every b
 signed:  designated => identifier "…bongotokencat" and certificate leaf = H"e280c8…"
 ```
 
+The script is safe to rerun and worth rerunning: besides issuing the certificate it
+authorises codesign to use the key, which is the step whose absence shows up later
+as `errSecInternalComponent` at signing time.
+
 `build-app.sh` falls back to ad-hoc when the identity is missing, so a clone with no
-certificate still builds. Back the identity up — reissuing it re-prompts every
+certificate still builds — but it stops rather than falling back when the identity
+is present and unusable, because an ad-hoc release would quietly void the Keychain
+grant of every existing install. Back the identity up — reissuing it re-prompts every
 existing user. It is not an Apple Developer certificate, so Gatekeeper still
 quarantines the download and the cask still clears it.
 
