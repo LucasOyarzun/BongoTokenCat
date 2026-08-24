@@ -125,9 +125,16 @@ enum UpdateInstaller {
 
     echo "=== upgrading $CASK ==="
     # `update` first: the cask lives in a tap that is a git clone, so without it brew
-    # compares against whatever it last fetched and reports nothing to upgrade. No
-    # `set -e` — a tap that failed to refresh is still worth attempting the upgrade on.
-    "$BREW" update
+    # compares against whatever it last fetched and reports nothing to upgrade.
+    #
+    # A failed refresh is logged but not fatal, deliberately. `brew update` also fails
+    # for reasons that have nothing to do with this tap — an unrelated tap, a blip on
+    # one of several fetches — and the cask is current in those cases, so the upgrade
+    # works. When the tap really is stale, `brew upgrade` finds nothing to do and exits
+    # 0, which is the same outcome as refusing to try. Attempting costs nothing.
+    if ! "$BREW" update; then
+        echo "!!! brew update failed; trying the upgrade against existing metadata"
+    fi
     "$BREW" upgrade --cask "$CASK"
     status=$?
     echo "=== brew exited $status ==="
