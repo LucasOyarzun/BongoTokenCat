@@ -33,11 +33,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dismissMonitors: [Any] = []
     private var decayTimer: Timer?
     private var usageTimer: Timer?
+    private var limitsTimer: Timer?
 
     /// State only ages, so it has to be re-evaluated on a clock rather than on
     /// events — an abandoned session emits nothing by definition.
     private static let decayInterval: TimeInterval = 5
     private static let usageInterval: TimeInterval = 5 * 60
+    /// Quota moves while you work, so it is worth a tighter clock than the transcript
+    /// scan — but it is one HTTP call to someone else's undocumented endpoint, so not
+    /// much tighter. Two minutes keeps the bars honest without leaning on it.
+    private static let limitsInterval: TimeInterval = 2 * 60
     private static let escapeKeyCode: UInt16 = 53
 
     /// Built here rather than from property defaults because the model spends from
@@ -55,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildStatusItem()
         startTimers()
         Task { await model.refreshTotals() }
+        Task { await model.refreshLimits(userInitiated: false) }
         overlay.sync()
         AppLog.write("BongoTokenCat started")
     }
@@ -108,6 +114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.refreshStatusTitle()
             }
         }
+        limitsTimer = Timer.scheduledTimer(withTimeInterval: Self.limitsInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.model.refreshLimits(userInitiated: false) }
+        }
     }
 
     // MARK: - Menu bar
@@ -146,6 +155,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         Task { await model.refreshTotals() }
+        // Deliberately not user-initiated: opening the menu is a glance, and a glance
+        // should never be answered with a Keychain dialog. Only the section's own
+        // buttons ask for that.
+        Task { await model.refreshLimits(userInitiated: false) }
         NSApp.activate()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()

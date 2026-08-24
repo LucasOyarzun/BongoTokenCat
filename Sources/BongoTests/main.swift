@@ -14,6 +14,7 @@ func runAllTests() async -> Never {
     runTokenReaderTests()
     runTokenReaderPerformanceTests()
     runUsageCacheTests()
+    runUsageLimitsTests()
     runOverlayInteractionTests()
     await runHookServerTests()
     reportAndExit()

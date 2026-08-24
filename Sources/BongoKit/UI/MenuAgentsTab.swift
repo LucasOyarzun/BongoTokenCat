@@ -9,6 +9,7 @@ struct MenuAgentsTab: View {
         VStack(alignment: .leading, spacing: 14) {
             if !model.hooksInstalled { setupCard }
             usageSection
+            limitsSection
             Divider()
             agentsSection
         }
@@ -58,6 +59,114 @@ struct MenuAgentsTab: View {
                 }
             }
         }
+    }
+
+    // MARK: - Limits
+
+    /// Sits under the token counters because it answers the question they raise.
+    /// They say what has been spent; this says how much room is left before the
+    /// wall — a different number from a different source, and the one you actually
+    /// plan a day around.
+    @ViewBuilder
+    private var limitsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Limits").font(.headline)
+                Spacer()
+                if model.isRefreshingLimits {
+                    ProgressView().controlSize(.small)
+                } else if model.showsUsageLimits {
+                    Button {
+                        Task { await model.refreshLimits(userInitiated: true) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Refresh limits")
+                }
+            }
+            limitsBody
+        }
+    }
+
+    @ViewBuilder
+    private var limitsBody: some View {
+        switch model.limitsState {
+        case .off:
+            enableLimitsCard
+        case .waiting:
+            Text("Checking your quota…").font(.caption).foregroundStyle(.secondary)
+        case .ready(let limits) where limits.isEmpty:
+            Text("Your account reports no usage limits.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .ready(let limits):
+            ForEach(limits.windows) { limitRow($0) }
+        case .needsAuthorization:
+            authorizationCard
+        case .unavailable(let reason):
+            Text(reason).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var enableLimitsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("See how much of your session and weekly quota is left. This asks Anthropic for your own account's limits — the only thing in this app that uses the network.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Show limits") { model.setUsageLimits(enabled: true) }
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private var authorizationCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("macOS needs your permission to read the Claude Code credential from the Keychain. Choose Always Allow and this stops asking.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Allow access") {
+                Task { await model.refreshLimits(userInitiated: true) }
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private func limitRow(_ window: LimitWindow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(window.name).font(.callout).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 4)
+                Text(percentText(window))
+                    .font(.callout)
+                    .monospacedDigit()
+                    .foregroundStyle(color(forUsed: window.usedPercent))
+                if let reset = window.resetsAt {
+                    Text(reset, style: .relative)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+            // The bar always fills with what has been used, whichever way the number
+            // beside it is phrased: its job is "how close to the wall", and so is the
+            // colour. A bar that emptied as the text counted down would say the same
+            // thing twice and leave the colour thresholds meaningless.
+            ProgressView(value: min(window.usedPercent, 100), total: 100)
+                .tint(color(forUsed: window.usedPercent))
+                .controlSize(.small)
+        }
+    }
+
+    private func percentText(_ window: LimitWindow) -> String {
+        model.limitsShowRemaining
+            ? "\(TokenFormatter.percent(window.remainingPercent)) left"
+            : "\(TokenFormatter.percent(window.usedPercent)) used"
+    }
+
+    private func color(forUsed used: Double) -> Color {
+        if used >= 90 { return .red }
+        if used >= 70 { return .orange }
+        return .primary
     }
 
     private func stat(_ title: String, _ value: String) -> some View {

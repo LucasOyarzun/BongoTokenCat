@@ -11,6 +11,8 @@ struct MenuCatTab: View {
         VStack(alignment: .leading, spacing: 14) {
             appearanceSection
             Divider()
+            limitsSection
+            Divider()
             instrumentsSection
         }
     }
@@ -53,6 +55,36 @@ struct MenuCatTab: View {
                     .buttonStyle(.link)
                     .font(.caption2)
             }
+        }
+    }
+
+    // MARK: - Limits
+
+    /// The section itself lives in the Agents tab; its preferences live here with
+    /// the rest of them.
+    private var limitsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Limits").font(.headline)
+
+            // Not a plain binding onto `settings`: switching this on is what permits
+            // the app's only network call, so it goes through the model that makes it.
+            Toggle("Show usage limits", isOn: Binding(
+                get: { model.showsUsageLimits },
+                set: { model.setUsageLimits(enabled: $0) }))
+
+            Picker("Show", selection: Binding(
+                get: { model.limitsShowRemaining },
+                set: { model.setLimitsShowRemaining($0) })) {
+                Text("Remaining").tag(true)
+                Text("Used").tag(false)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .disabled(!model.showsUsageLimits)
+
+            Text("Asks Anthropic for your account's own quota, using the credential Claude Code already stores on this Mac.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 

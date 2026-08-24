@@ -40,6 +40,20 @@ final class Settings {
         didSet { defaults.set(showsWorkspaceLabels, forKey: Keys.showsWorkspaceLabels) }
     }
 
+    /// Off until asked for. Every other number in the app is read from files already
+    /// on the disk; this one is the only thing that opens a network connection, so
+    /// it is the user who decides that it may.
+    var showsUsageLimits: Bool {
+        didSet { defaults.set(showsUsageLimits, forKey: Keys.showsUsageLimits) }
+    }
+
+    /// "83% left" rather than "17% used". Both are the same number and people read
+    /// quota in opposite directions, so it is a preference rather than a choice made
+    /// once on everybody's behalf.
+    var limitsShowRemaining: Bool {
+        didSet { defaults.set(limitsShowRemaining, forKey: Keys.limitsShowRemaining) }
+    }
+
     /// Coats bought from the shop. Only ever added to — a coat you paid for stays
     /// yours, and the balance it cost comes back as the lifetime count grows.
     private(set) var purchasedCoatIDs: Set<String> {
@@ -58,6 +72,8 @@ final class Settings {
         static let catWidth = "catWidth"
         static let showsOverlay = "showsOverlay"
         static let showsWorkspaceLabels = "showsWorkspaceLabels"
+        static let showsUsageLimits = "showsUsageLimits"
+        static let limitsShowRemaining = "limitsShowRemaining"
         static let hasCustomPosition = "hasCustomPosition"
         static let originX = "overlayOriginX"
         static let originY = "overlayOriginY"
@@ -77,6 +93,8 @@ final class Settings {
         catWidth = defaults.object(forKey: Keys.catWidth) as? Double ?? Self.defaultCatWidth
         showsOverlay = defaults.object(forKey: Keys.showsOverlay) as? Bool ?? true
         showsWorkspaceLabels = defaults.object(forKey: Keys.showsWorkspaceLabels) as? Bool ?? true
+        showsUsageLimits = defaults.object(forKey: Keys.showsUsageLimits) as? Bool ?? false
+        limitsShowRemaining = defaults.object(forKey: Keys.limitsShowRemaining) as? Bool ?? true
         if defaults.bool(forKey: Keys.hasCustomPosition) {
             overlayOrigin = CGPoint(x: defaults.double(forKey: Keys.originX),
                                     y: defaults.double(forKey: Keys.originY))
