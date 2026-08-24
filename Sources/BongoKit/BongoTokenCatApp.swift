@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var server: HookServer?
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    /// Live only while the menu is open — see `startDismissMonitors`.
+    private var dismissMonitors: [Any] = []
     private var decayTimer: Timer?
     private var usageTimer: Timer?
     private var limitsTimer: Timer?
@@ -41,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// scan — but it is one HTTP call to someone else's undocumented endpoint, so not
     /// much tighter. Two minutes keeps the bars honest without leaning on it.
     private static let limitsInterval: TimeInterval = 2 * 60
+    private static let escapeKeyCode: UInt16 = 53
 
     /// Built here rather than from property defaults because the model spends from
     /// the same settings the menu writes to, and one of them has to exist first.
@@ -135,10 +138,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.title = parts.joined(separator: " ")
     }
 
+    /// Opening the menu has to activate the app first.
+    ///
+    /// An accessory app is never the active app, so a popover shown from a status
+    /// item takes key focus for an instant and then loses it again as AppKit settles
+    /// activation back where it was. `.transient` reads that as a click outside, so
+    /// the menu closed itself a second or two after opening with nobody having
+    /// touched anything. Activating is also what makes the controls inside respond
+    /// to their first click instead of swallowing it.
     @objc private func togglePopover() {
+        guard let button = statusItem?.button else { return }
         let popover = popover ?? makePopover()
         self.popover = popover
-        guard let button = statusItem?.button else { return }
         if popover.isShown {
             popover.performClose(nil)
             return
@@ -148,13 +159,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // should never be answered with a Keychain dialog. Only the section's own
         // buttons ask for that.
         Task { await model.refreshLimits(userInitiated: false) }
+        NSApp.activate()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        startDismissMonitors()
+    }
+
+    /// Closing is ours to decide (`.applicationDefined`), so these restore the one
+    /// dismissal gesture the menu should have and no more: a click outside, or
+    /// Escape. A *global* mouse monitor only sees events bound for other
+    /// applications, which is exactly what "outside" means here — a click on the
+    /// status item or on a cat still travels its own path and leaves the menu open.
+    private func startDismissMonitors() {
+        guard dismissMonitors.isEmpty else { return }
+        let clickOutside = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.popover?.performClose(nil)
+        }
+        let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == Self.escapeKeyCode else { return event }
+            self?.popover?.performClose(nil)
+            return nil
+        }
+        dismissMonitors = [clickOutside, escape].compactMap { $0 }
     }
 
     private func makePopover() -> NSPopover {
         let popover = NSPopover()
-        popover.behavior = .transient
+        popover.delegate = self
+        // Not `.transient`: that hands closing to AppKit's idea of who is active,
+        // which an accessory app loses the moment after it shows the popover.
+        popover.behavior = .applicationDefined
         popover.contentSize = NSSize(width: MenuContentView.preferredSize.width,
                                      height: MenuContentView.preferredSize.height)
         popover.contentViewController = NSHostingController(
@@ -168,5 +202,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         )
         return popover
+    }
+}
+
+/// Tying the monitors' lifetime to the popover's own close callback means no path
+/// can leak one — dismissing by click, by Escape, or by pressing the status item
+/// again all end up here.
+extension AppDelegate: NSPopoverDelegate {
+    func popoverDidClose(_ notification: Notification) {
+        dismissMonitors.forEach(NSEvent.removeMonitor)
+        dismissMonitors = []
     }
 }
